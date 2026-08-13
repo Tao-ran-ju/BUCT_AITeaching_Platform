@@ -1,0 +1,58 @@
+body {
+  min-height: 100%;
+  margin: 0;
+  background-image: url("../images/buct_changping_campus.jpeg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed; /* 背景固定，不随滚动移动 */
+  
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(255,255,255,0.8); /* 黑色半透明遮罩，等效降低图片透明度 */
+  z-index: -1;
+}
+
+.wrapper {
+    margin:0 auto;
+    width: 1175px;
+}
+
+.shortcut {
+    height:52px;
+    background-color:white;
+    box-shadow: 0 8px 10px rgba(0,0,0,0.15);
+    position: sticky;
+    top: 0;
+}
+
+.shortcut .wrapper {
+    display:flex;
+    justify-content:flex-end;
+    height:52px;
+    background-color:white;
+
+}
+
+.shortcut ul {
+    display: flex;
+    line-height: 52px;
+}
+
+.shortcut li a {
+    padding:0 15px;
+    border-right:1px solid #333;
+}
+
+.wrapper ul li:last-child a {
+    border-right:none;
+}
+
+.activated {
+    color: purple;
+}
+
