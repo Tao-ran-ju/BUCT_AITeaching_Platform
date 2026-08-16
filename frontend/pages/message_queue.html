@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="北京化工大学AI教师管理端，一站式教师服务平台">
+    <meta name="keywords" content="管理平台,教师,智能体,北京化工大学,BUCT">
+    <title>北化AI教师管理端-消息队列</title>
+    <link rel="shortcut icon" href="../favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="../css/base.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/pages/message_queue.css">
+</head>
+<body>
+    <div class="shortcut">
+        <div class="wrapper" style="position: relative;">
+            <img src="../assets/images/buct.png" alt="">
+            <img src="../assets/images/college_of_information_science_and_technology.png" alt="" style="margin:0 25px; max-width: 90%; max-height: 90%; display: block; margin-top: 2.6px;">
+            <span style="line-height: 52px; font-family: 'STXingkai', '华文行楷', sans-serif; font-weight:700; font-size: 40px;">教师端在线</span>
+            <ul style="margin-left: auto;">
+                <li><a href="../index.html">网站主页</a></li>
+                <li><a href="./course_resources.html">课程资源</a></li>
+                <li><a href="./class_management.html">班级管理</a></li>
+                <li><a href="./aigc.html">备课中心</a></li>
+                <li><a href="./homework_correction.html">作业批改</a></li>
+                <li><a href="./message_queue.html">消息队列</a></li>
+                <li><a href="./personal_setting.html">个人设置</a></li>
+            </ul>
+            <div class="underline" style="position: absolute;bottom:8px;height:2px;background:blue;transition:0.3s; width:65px"></div>
+        </div>
+    </div>
+
+    <div class="wrapper page-body">
+        <div class="page-header">
+            <h2>通知公告与任务发布</h2>
+            <p>向学生批量发布通知与作业任务，支持 Word 附件；发布后写入消息中心，学生端实时可见。</p>
+        </div>
+
+        <div class="mq-layout">
+            <!-- 左栏：通知公告 -->
+            <section class="panel mq-left">
+                <div class="panel-head">
+                    <h3>通知公告</h3>
+                </div>
+                <div class="panel-body">
+                    <ul class="notice-list" id="noticeList"></ul>
+                </div>
+            </section>
+
+            <!-- 右栏：发布 + 任务看板 -->
+            <div class="mq-right">
+                <section class="panel">
+                    <div class="panel-head">
+                        <h3>发布通知 / 任务</h3>
+                    </div>
+                    <div class="panel-body">
+                        <form id="publishForm">
+                            <div class="form-row">
+                                <label class="form-label">类型</label>
+                                <select class="form-select" id="msgType">
+                                    <option value="notice">通知公告</option>
+                                    <option value="assignment">作业任务</option>
+                                    <option value="system">系统消息</option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <label class="form-label">标题</label>
+                                <input class="form-input" id="msgTitle" placeholder="请输入标题">
+                            </div>
+                            <div class="form-row">
+                                <label class="form-label">内容</label>
+                                <textarea class="form-textarea" id="msgContent" placeholder="请输入通知 / 任务内容"></textarea>
+                            </div>
+                            <div class="form-row" id="deadlineRow" style="display:none;">
+                                <label class="form-label">截止时间</label>
+                                <input class="form-input" id="msgDeadline" placeholder="如：2024-09-25 23:59">
+                            </div>
+                            <div class="form-row">
+                                <label class="form-label">接收班级（可选）</label>
+                                <select class="form-select" id="classSelect">
+                                    <option value="">手动填写学号</option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <label class="form-label">接收学生学号</label>
+                                <textarea class="form-textarea" id="msgReceivers" placeholder="学号，逗号或换行分隔，如：2022040152, 2022040153"></textarea>
+                                <p class="form-hint">选择班级后自动填充该班学生学号，也可手动修改。</p>
+                            </div>
+                            <div class="form-row">
+                                <label class="form-label">Word 附件（选填）</label>
+                                <input class="form-input file-input" type="file" id="msgFile" accept=".doc,.docx">
+                                <p class="form-hint">仅支持 .doc / .docx，单个不超过 10MB。</p>
+                            </div>
+                            <button type="submit" class="btn">发布</button>
+                        </form>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-head">
+                        <h3>任务看板 <span class="muted" id="taskHint"></span></h3>
+                        <button class="btn small" id="btnNewTask">+ 发布学习任务</button>
+                    </div>
+                    <div class="panel-body">
+                        <ul class="task-list" id="taskList"></ul>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI 问答助手分区 -->
+    <section class="panel qa-panel">
+        <div class="panel-head">
+            <h3>AI 问答助手</h3>
+            <span class="muted">学生提问自动分流：简单问题 AI 直接回复，复杂问题留待你人工处理</span>
+        </div>
+        <div class="panel-body">
+            <div class="qa-stats" id="qaStats"></div>
+            <ul class="qa-list" id="qaList"></ul>
+        </div>
+    </section>
+
+    <!-- 通用模态框（发布学习任务） -->
+    <div class="modal-mask" id="modalMask">
+        <div class="modal">
+            <div class="modal-head">
+                <h3 id="modalTitle">发布学习任务</h3>
+                <span class="modal-close" id="modalClose">&times;</span>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-foot">
+                <button class="btn secondary" id="modalCancel">取消</button>
+                <button class="btn" id="modalOk">发布</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../assets/lib/axios.min.js"></script>
+    <script src="../js/pages/api.js"></script>
+    <script src="../js/pages/common.js"></script>
+    <script src="../js/pages/message_queue.js"></script>
+</body>
+</html>

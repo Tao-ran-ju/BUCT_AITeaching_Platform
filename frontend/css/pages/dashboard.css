@@ -1,0 +1,385 @@
+/* 数据驾驶舱页 */
+.page-header {
+    margin-bottom: 20px;
+}
+
+.page-header h2 {
+    font-size: 24px;
+    color: #333;
+    margin-bottom: 6px;
+}
+
+.page-header p {
+    color: #666;
+    font-size: 14px;
+}
+
+/* 顶部工具条 */
+.dash-toolbar {
+    display: flex;
+    align-items: flex-end;
+    margin-bottom: 16px;
+}
+
+.dash-toolbar .form-row {
+    margin-bottom: 0;
+}
+
+.dash-toolbar .form-select {
+    width: 220px;
+}
+
+/* 指标卡 */
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.metric-card {
+    background: #fff;
+    border: 2px solid #d0d0d0;
+    border-radius: 5px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.metric-label {
+    font-size: 13px;
+    color: #666;
+}
+
+.metric-value {
+    font-size: 30px;
+    font-weight: 700;
+    color: #333;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.metric-unit {
+    font-size: 14px;
+    font-weight: 400;
+    color: #999;
+    margin-left: 4px;
+}
+
+.metric-trend {
+    font-size: 12px;
+}
+
+.metric-trend.up { color: #2e7d32; }
+.metric-trend.down { color: #e94560; }
+
+/* 面板副标题 */
+.panel-sub {
+    font-size: 12px;
+    color: #999;
+}
+
+/* 能力矩阵热力图（按知识点排行的横向条形） */
+.heatmap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.heat-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.heat-name {
+    width: 200px;
+    flex-shrink: 0;
+    font-size: 14px;
+    color: #444;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.heat-track {
+    flex: 1;
+    height: 22px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.heat-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.heat-val {
+    width: 48px;
+    flex-shrink: 0;
+    font-size: 13px;
+    color: #555;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 图例（顺序渐变：低 → 高） */
+.heat-legend {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    font-size: 12px;
+    color: #999;
+}
+
+.heat-legend-bar {
+    flex: 1;
+    height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(to right, #eadcfb, #c9a9ef, #a478e0, #7d3ec4, #5a1a9b);
+}
+
+/* ========== 学习不积极学生 · 学情预警 ========== */
+.panel-title-group {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+}
+
+.panel-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.dash-warning-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.dash-warn-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.dash-warn-item:last-child {
+    border-bottom: none;
+}
+
+.dash-warn-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    min-width: 230px;
+}
+
+.dash-warn-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.dash-warn-course {
+    font-size: 12px;
+    color: #999;
+}
+
+.dash-warn-reason {
+    flex: 1;
+    font-size: 13px;
+    color: #666;
+    line-height: 1.6;
+}
+
+.dash-warn-item .btn {
+    flex-shrink: 0;
+}
+
+/* ========== 任务进度热力图 ========== */
+.task-heat {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-x: auto;
+}
+
+.task-heat-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 660px;
+    padding: 4px 0;
+}
+
+.task-heat-head .th-name {
+    font-weight: 600;
+    color: #333;
+}
+
+.task-heat-head .th-cell {
+    font-weight: 600;
+    color: #555;
+}
+
+.th-name {
+    width: 260px;
+    flex-shrink: 0;
+    font-size: 13px;
+    color: #444;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.th-cell {
+    width: 60px;
+    flex-shrink: 0;
+    text-align: center;
+    font-size: 12px;
+    color: #888;
+}
+
+.th-rate {
+    width: 70px;
+    flex-shrink: 0;
+    text-align: center;
+    font-size: 12px;
+    color: #555;
+    font-variant-numeric: tabular-nums;
+}
+
+.cell {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+}
+
+.cell.completed { background: #43a047; }
+.cell.pending { background: #d0d0d0; }
+.cell.overdue { background: #e94560; }
+
+.task-heat-legend {
+    display: flex;
+    gap: 18px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: #666;
+}
+
+.tl-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tl-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.tl-dot.completed { background: #43a047; }
+.tl-dot.pending { background: #d0d0d0; }
+.tl-dot.overdue { background: #e94560; }
+
+/* ========== 柱状图（成绩分布） ========== */
+.bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+    height: 220px;
+    padding: 10px 0;
+}
+
+.bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    gap: 6px;
+    min-width: 40px;
+}
+
+.bar-count {
+    font-size: 13px;
+    color: #555;
+    font-variant-numeric: tabular-nums;
+}
+
+.bar {
+    width: 100%;
+    max-width: 56px;
+    border-radius: 4px 4px 0 0;
+    transition: height 0.4s ease;
+}
+
+.bar-label {
+    font-size: 13px;
+    color: #444;
+}
+
+.bar-range {
+    font-size: 11px;
+    color: #999;
+}
+
+/* ========== 教学效果对比 ========== */
+.effect-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 0;
+}
+
+.effect-name {
+    width: 170px;
+    flex-shrink: 0;
+    font-size: 13px;
+    color: #444;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.effect-track {
+    flex: 1;
+    height: 18px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.effect-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.effect-score {
+    width: 70px;
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 13px;
+    color: #555;
+    font-variant-numeric: tabular-nums;
+}
+
+.effect-pass {
+    width: 92px;
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 12px;
+    color: #2e7d32;
+}

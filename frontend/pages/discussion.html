@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="北京化工大学AI教师管理端，一站式教师服务平台">
+    <meta name="keywords" content="管理平台,教师,智能体,北京化工大学,BUCT">
+    <title>北化AI教师管理端-主题讨论区</title>
+    <link rel="shortcut icon" href="../favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="../css/base.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/pages/discussion.css">
+</head>
+<body>
+    <div class="shortcut">
+        <div class="wrapper" style="position: relative;">
+            <img src="../assets/images/buct.png" alt="">
+            <img src="../assets/images/college_of_information_science_and_technology.png" alt="" style="margin:0 25px; max-width: 90%; max-height: 90%; display: block; margin-top: 2.6px;">
+            <span style="line-height: 52px; font-family: 'STXingkai', '华文行楷', sans-serif; font-weight:700; font-size: 40px;">教师端在线</span>
+            <ul style="margin-left: auto;">
+                <li><a href="../index.html">网站主页</a></li>
+                <li><a href="./course_resources.html">课程资源</a></li>
+                <li><a href="./class_management.html">班级管理</a></li>
+                <li><a href="./aigc.html">备课中心</a></li>
+                <li><a href="./homework_correction.html">作业批改</a></li>
+                <li><a href="./message_queue.html">消息队列</a></li>
+                <li><a href="./personal_setting.html">个人设置</a></li>
+            </ul>
+            <div class="underline" style="position: absolute;bottom:8px;height:2px;background:blue;transition:0.3s; width:65px"></div>
+        </div>
+    </div>
+
+    <div class="wrapper page-body">
+        <div class="page-header">
+            <h2>主题讨论区</h2>
+            <p>围绕课程发起主题讨论，支持置顶与精华帖标记，沉淀高质量问答。</p>
+        </div>
+
+        <div class="disc-layout">
+            <!-- 左栏：发帖 -->
+            <section class="panel disc-left">
+                <div class="panel-head"><h3>发起新帖</h3></div>
+                <div class="panel-body">
+                    <form id="postForm">
+                        <div class="form-row">
+                            <label class="form-label">所属课程</label>
+                            <select class="form-select" id="postCourse"></select>
+                        </div>
+                        <div class="form-row">
+                            <label class="form-label">标题</label>
+                            <input class="form-input" id="postTitle" placeholder="请输入讨论主题">
+                        </div>
+                        <div class="form-row">
+                            <label class="form-label">内容</label>
+                            <textarea class="form-textarea" id="postContent" placeholder="描述你的问题或观点…"></textarea>
+                        </div>
+                        <button type="submit" class="btn">发布帖子</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- 右栏：帖子列表 -->
+            <section class="panel disc-right">
+                <div class="panel-head">
+                    <h3>帖子列表 <span class="muted" id="postHint"></span></h3>
+                </div>
+                <div class="panel-body">
+                    <ul class="post-list" id="postList"></ul>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script src="../assets/lib/axios.min.js"></script>
+    <script src="../js/pages/api.js"></script>
+    <script src="../js/pages/common.js"></script>
+    <script src="../js/pages/discussion.js"></script>
+</body>
+</html>

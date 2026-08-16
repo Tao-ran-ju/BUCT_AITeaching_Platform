@@ -11,25 +11,23 @@
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="./css/base.css">
     <link rel="stylesheet" href="./css/common.css">
-    <link rel="stylesheet" href="./css/index.css">
-    <link rel="icon" href="logo.ico" type="image/x-icon">
-    <link rel="" href="">
+    <link rel="stylesheet" href="./css/pages/index.css">
 </head>
 <body>
     <!--快捷导航区域：网站主页-->
     <div class="shortcut">
         <div class="wrapper" style="position: relative;">
-            <img src="./images/buct.png" alt="">
-            <img src="./images/college_of_information_science_and_technology.png" alt="" style="margin:0 25px; max-width: 90%; max-height: 90%; display: block; margin-top: 2.6px;">
+            <img src="./assets/images/buct.png" alt="">
+            <img src="./assets/images/college_of_information_science_and_technology.png" alt="" style="margin:0 25px; max-width: 90%; max-height: 90%; display: block; margin-top: 2.6px;">
             <span style="line-height: 52px; font-family: 'STXingkai', '华文行楷', sans-serif; font-weight:700; font-size: 40px;">教师端在线</span>
             <ul style="margin-left: auto;">
                 <li><a href="./index.html">网站主页</a></li>
-                <li><a href="./course_resources.html">课程资源</a></li>
-                <li><a href="./class_management.html">班级管理</a></li>
-                <li><a href="./aigc.html">备课中心</a></li>
-                <li><a href="./homework_correction.html">作业批改</a></li>
-                <li><a href="./message_queue.html">消息队列</a></li>
-                <li><a href="./personal_setting.html">个人设置</a></li>
+                <li><a href="./pages/course_resources.html">课程资源</a></li>
+                <li><a href="./pages/class_management.html">班级管理</a></li>
+                <li><a href="./pages/aigc.html">备课中心</a></li>
+                <li><a href="./pages/homework_correction.html">作业批改</a></li>
+                <li><a href="./pages/message_queue.html">消息队列</a></li>
+                <li><a href="./pages/personal_setting.html">个人设置</a></li>
             </ul>
             <div class="underline" style="position: absolute;bottom:8px;height:2px;background:blue;transition:0.3s; width:65px"></div>
         </div>
@@ -42,7 +40,7 @@
             <div class="news">
             <h3>系统公告</h3>
             <ul class="news_content">
-                <li><a href="./Q&A.html">新人入站必看！关于教师端的集中答疑Q&A</a></li>
+                <li><a href="./pages/Q&A.html">新人入站必看！关于教师端的集中答疑Q&A</a></li>
                 <li>关于教师端服务器维修的通知</li>
                 <li>关于教师端网页功能布局的改动通知</li>
                 <li>其他公告信息示例</li>
@@ -56,9 +54,9 @@
             <!-- 中间：轮播Banner -->
             <div class="banner" id="banner">
             <div class="banner-images">
-                <img src="./uploads/banner1.jpeg" alt="轮播图1" class="banner-item active">
-                <img src="./uploads/banner2.jpeg" alt="轮播图2" class="banner-item">
-                <img src="./uploads/banner3.jpeg" alt="轮播图3" class="banner-item">
+                <img src="./assets/images/banner1.jpeg" alt="轮播图1" class="banner-item active">
+                <img src="./assets/images/banner2.jpeg" alt="轮播图2" class="banner-item">
+                <img src="./assets/images/banner3.jpeg" alt="轮播图3" class="banner-item">
             </div>
             <!-- 左右切换按钮 -->
             <a href="javascript:;" class="banner-arrow arrow-left" id="prevBtn">&lt;</a>
@@ -94,6 +92,30 @@
                 <div class="day-grid" id="dayGrid"></div>
                 </div>
             </div>
+        </div>
+
+        <!-- 功能入口：数据驾驶舱 / 学情预警（保持快捷导航区不变） -->
+        <div class="feature-entry">
+            <a class="feature-card" href="./pages/dashboard.html">
+                <span class="feature-icon">📊</span>
+                <span class="feature-title">数据驾驶舱</span>
+                <span class="feature-desc">核心指标 · 能力矩阵 · 学习不积极学生预警</span>
+            </a>
+            <a class="feature-card" href="./pages/warning.html">
+                <span class="feature-icon">⚠️</span>
+                <span class="feature-title">学情预警与干预</span>
+                <span class="feature-desc">规则扫描 · 风险分级 · AI 干预建议</span>
+            </a>
+            <a class="feature-card" href="./pages/discussion.html">
+                <span class="feature-icon">💬</span>
+                <span class="feature-title">主题讨论区</span>
+                <span class="feature-desc">发帖讨论 · 精华置顶 · 师生互动</span>
+            </a>
+            <a class="feature-card" href="./pages/team.html">
+                <span class="feature-icon">👥</span>
+                <span class="feature-title">学习小组</span>
+                <span class="feature-desc">组建小组 · 指定组长 · 成员管理</span>
+            </a>
         </div>
     </div>
 

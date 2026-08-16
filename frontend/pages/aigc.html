@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="北京化工大学AI教师管理端，一站式教师服务平台">
+    <meta name="keywords" content="管理平台,教师,智能体,北京化工大学,BUCT">
+    <title>北化AI教师管理端-备课中心</title>
+    <link rel="shortcut icon" href="../favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="../css/base.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/pages/aigc.css">
+</head>
+<body>
+    <div class="shortcut">
+        <div class="wrapper" style="position: relative;">
+            <img src="../assets/images/buct.png" alt="">
+            <img src="../assets/images/college_of_information_science_and_technology.png" alt="" style="margin:0 25px; max-width: 90%; max-height: 90%; display: block; margin-top: 2.6px;">
+            <span style="line-height: 52px; font-family: 'STXingkai', '华文行楷', sans-serif; font-weight:700; font-size: 40px;">教师端在线</span>
+            <ul style="margin-left: auto;">
+                <li><a href="../index.html">网站主页</a></li>
+                <li><a href="./course_resources.html">课程资源</a></li>
+                <li><a href="./class_management.html">班级管理</a></li>
+                <li><a href="./aigc.html">备课中心</a></li>
+                <li><a href="./homework_correction.html">作业批改</a></li>
+                <li><a href="./message_queue.html">消息队列</a></li>
+                <li><a href="./personal_setting.html">个人设置</a></li>
+            </ul>
+            <div class="underline" style="position: absolute;bottom:8px;height:2px;background:blue;transition:0.3s; width:65px"></div>
+        </div>
+    </div>
+
+    <div class="wrapper page-body">
+        <div class="page-header">
+            <h2>AI 教研与备课中心</h2>
+            <p>基于大模型统一封装，覆盖备课、出题、项目设计与教学总结全流程。</p>
+        </div>
+
+        <!-- 工具切换 -->
+        <div class="tool-tabs">
+            <button class="tool-tab active" data-tool="plan">教案生成</button>
+            <button class="tool-tab" data-tool="outline">课程大纲</button>
+            <button class="tool-tab" data-tool="ppt">PPT 生成</button>
+            <button class="tool-tab" data-tool="quiz">智能题库</button>
+            <button class="tool-tab" data-tool="exam">智能组卷</button>
+            <button class="tool-tab" data-tool="review">题目评估</button>
+            <button class="tool-tab" data-tool="project">项目助手</button>
+            <button class="tool-tab" data-tool="report">教学报告</button>
+            <button class="tool-tab" data-tool="summarize">资源摘要</button>
+        </div>
+
+        <div class="tool-panel">
+            <!-- 教案生成 -->
+            <div class="tool-form active" id="form-plan">
+                <div class="form-row">
+                    <label class="form-label">知识点</label>
+                    <input class="form-input" id="planKp" placeholder="如：动态规划 - 01 背包">
+                </div>
+                <div class="form-row">
+                    <label class="form-label">教学目标（选填）</label>
+                    <textarea class="form-textarea" id="planGoal" placeholder="如：让学生掌握状态转移方程的设计思路"></textarea>
+                </div>
+                <button class="btn" data-submit="plan">生成教案</button>
+            </div>
+
+            <!-- 课程大纲 -->
+            <div class="tool-form" id="form-outline">
+                <div class="form-row">
+                    <label class="form-label">课程名称 / 主题</label>
+                    <input class="form-input" id="outlineCourse" placeholder="如：算法设计与分析">
+                </div>
+                <div class="form-row">
+                    <label class="form-label">教学目标（选填）</label>
+                    <textarea class="form-textarea" id="outlineGoal" placeholder="如：掌握经典算法设计范式并能用于竞赛解题"></textarea>
+                </div>
+                <button class="btn" data-submit="outline">生成课程大纲</button>
+            </div>
+
+            <!-- PPT 生成 -->
+            <div class="tool-form" id="form-ppt">
+                <div class="form-row">
+                    <label class="form-label">授课主题</label>
+                    <input class="form-input" id="pptTopic" placeholder="如：动态规划 - 最长公共子序列">
+                </div>
+                <div class="form-row">
+                    <label class="form-label">教学目标（选填）</label>
+                    <textarea class="form-textarea" id="pptObjective" placeholder="如：理解状态定义与转移方程的推导"></textarea>
+                </div>
+                <div class="form-row">
+                    <label class="form-label">参考大纲 / 内容（选填）</label>
+                    <textarea class="form-textarea" id="pptOutline" placeholder="粘贴已有教案或大纲要点，帮助 PPT 更贴合你的授课安排"></textarea>
+                </div>
+                <button class="btn" data-submit="ppt">生成 PPT 大纲</button>
+            </div>
+
+            <!-- 智能题库 -->
+            <div class="tool-form" id="form-quiz">
+                <div class="form-row">
+                    <label class="form-label">知识点</label>
+                    <input class="form-input" id="quizKp" placeholder="如：图的最短路径">
+                </div>
+                <div class="form-row quiz-row">
+                    <div>
+                        <label class="form-label">题目数量</label>
+                        <input class="form-input" id="quizCount" type="number" min="1" max="20" value="5">
+                    </div>
+                    <div>
+                        <label class="form-label">难度（1-5）</label>
+                        <input class="form-input" id="quizDifficulty" type="number" min="1" max="5" value="3">
+                    </div>
+                </div>
+                <button class="btn" data-submit="quiz">生成题库</button>
+            </div>
+
+            <!-- 智能组卷 -->
+            <div class="tool-form" id="form-exam">
+                <div class="form-row">
+                    <label class="form-label">考核知识点</label>
+                    <input class="form-input" id="examKp" placeholder="如：图论与搜索">
+                </div>
+                <div class="form-row quiz-row">
+                    <div>
+                        <label class="form-label">题量</label>
+                        <input class="form-input" id="examCount" type="number" min="1" max="30" value="10">
+                    </div>
+                    <div>
+                        <label class="form-label">难度（1-5）</label>
+                        <input class="form-input" id="examDifficulty" type="number" min="1" max="5" value="3">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <label class="form-label">题型分布（选填）</label>
+                    <input class="form-input" id="examTypes" placeholder="如：选择题、填空题、简答题、编程题">
+                </div>
+                <button class="btn" data-submit="exam">智能组卷</button>
+            </div>
+
+            <!-- 题目质量评估 -->
+            <div class="tool-form" id="form-review">
+                <div class="form-row">
+                    <label class="form-label">待评估题目</label>
+                    <textarea class="form-textarea tall" id="reviewQuestion" placeholder="粘贴需要评估的题目（题干 + 参考答案 + 解析，至少 10 字）"></textarea>
+                </div>
+                <button class="btn" data-submit="review">评估题目质量</button>
+            </div>
+
+            <!-- 项目助手 -->
+            <div class="tool-form" id="form-project">
+                <div class="form-row">
+                    <label class="form-label">项目主题</label>
+                    <input class="form-input" id="projectTopic" placeholder="如：校园导航系统（图的最短路应用）">
+                </div>
+                <div class="form-row quiz-row">
+                    <div>
+                        <label class="form-label">难度（1-5）</label>
+                        <input class="form-input" id="projectDifficulty" type="number" min="1" max="5" value="3">
+                    </div>
+                    <div>
+                        <label class="form-label">项目目标（选填）</label>
+                        <input class="form-input" id="projectGoal" placeholder="如：掌握图算法并完成系统集成">
+                    </div>
+                </div>
+                <button class="btn" data-submit="project">生成项目方案</button>
+            </div>
+
+            <!-- 教学报告 -->
+            <div class="tool-form" id="form-report">
+                <div class="form-row">
+                    <label class="form-label">课程名称</label>
+                    <input class="form-input" id="reportCourse" placeholder="如：数据结构">
+                </div>
+                <div class="form-row">
+                    <label class="form-label">学期数据（选填）</label>
+                    <textarea class="form-textarea tall" id="reportData" placeholder="粘贴成绩分布、作业完成率、到课率等数据，报告将结合数据给出分析"></textarea>
+                </div>
+                <button class="btn" data-submit="report">生成教学报告</button>
+            </div>
+
+            <!-- 资源摘要 -->
+            <div class="tool-form" id="form-summarize">
+                <div class="form-row">
+                    <label class="form-label">资源原文 / 内容</label>
+                    <textarea class="form-textarea tall" id="sumText" placeholder="粘贴需要摘要的文本内容（至少 10 字）"></textarea>
+                </div>
+                <button class="btn" data-submit="summarize">生成摘要</button>
+            </div>
+        </div>
+
+        <!-- 输出区 -->
+        <section class="panel output-panel">
+            <div class="panel-head">
+                <h3>生成结果</h3>
+                <button class="btn secondary small" id="btnCopy">复制</button>
+            </div>
+            <div class="panel-body">
+                <pre class="output" id="output">请在左侧填写内容并点击生成。</pre>
+            </div>
+        </section>
+    </div>
+
+    <script src="../assets/lib/axios.min.js"></script>
+    <script src="../js/pages/api.js"></script>
+    <script src="../js/pages/common.js"></script>
+    <script src="../js/pages/aigc.js"></script>
+</body>
+</html>

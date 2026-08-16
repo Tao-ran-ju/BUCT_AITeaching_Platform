@@ -1,0 +1,248 @@
+/* 课程资源页布局 */
+.page-header {
+    margin-bottom: 20px;
+}
+
+.page-header h2 {
+    font-size: 24px;
+    color: #333;
+    margin-bottom: 6px;
+}
+
+.page-header p {
+    color: #666;
+    font-size: 14px;
+}
+
+.cr-layout {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.cr-left {
+    flex: 1 1 42%;
+    min-width: 0;
+}
+
+.cr-right {
+    flex: 1 1 58%;
+    min-width: 0;
+}
+
+.muted {
+    font-weight: normal;
+    font-size: 12px;
+    color: #999;
+    margin-left: 6px;
+}
+
+/* 课程列表 */
+.course-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.course-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid #e5e5e5;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.course-item:hover {
+    border-color: purple;
+    background-color: #fafafa;
+}
+
+.course-item.active {
+    border-color: purple;
+    background-color: #f3e8ff;
+}
+
+.course-item .name {
+    font-weight: 600;
+    color: #333;
+}
+
+.course-item .meta {
+    font-size: 12px;
+    color: #999;
+    margin-top: 2px;
+}
+
+.course-item .actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+/* 章节 / 知识点树 */
+.tree-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 40px;
+}
+
+.tree-item {
+    padding: 9px 12px;
+    border: 1px solid #e5e5e5;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #444;
+    transition: all 0.2s;
+}
+
+.tree-item:hover {
+    border-color: purple;
+    background-color: #fafafa;
+}
+
+.tree-item.active {
+    border-color: purple;
+    background-color: #f3e8ff;
+    color: purple;
+}
+
+.tree-item .desc {
+    font-size: 12px;
+    color: #999;
+    margin-top: 2px;
+}
+
+/* 上传表单 */
+.upload-form .btn {
+    margin-top: 4px;
+}
+
+/* 资源操作按钮组 */
+.row-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.visibility-select {
+    padding: 4px 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 12px;
+    outline: none;
+}
+
+.visibility-select:focus {
+    border-color: purple;
+}
+
+/* 课程封面缩略图与主体布局 */
+.course-cover {
+    width: 44px;
+    height: 44px;
+    border-radius: 4px;
+    object-fit: cover;
+    border: 1px solid #e5e5e5;
+    flex-shrink: 0;
+    background: #f4f4f4;
+}
+
+.course-cover.placeholder {
+    display: inline-block;
+    background: linear-gradient(135deg, #f3e8ff, #eadcfb);
+}
+
+.course-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.course-item .name {
+    font-weight: 600;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.course-item .actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* 章节 / 知识点行内编辑删除按钮 */
+.tree-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.tree-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.tree-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.tree-actions .btn {
+    padding: 2px 6px;
+    font-size: 12px;
+}
+
+/* 资源摘要 / 关键词 */
+.res-annot {
+    max-width: 220px;
+}
+
+.res-summary {
+    font-size: 12px;
+    color: #555;
+    line-height: 1.5;
+}
+
+.res-keywords {
+    font-size: 12px;
+    color: #6a0dad;
+    margin-top: 2px;
+}
+
+.pending-tip {
+    font-size: 12px;
+    color: #bbb;
+}
+
+/* 视频资源缩略图与播放标题 */
+.res-thumb {
+    width: 56px;
+    height: 32px;
+    object-fit: cover;
+    border-radius: 3px;
+    border: 1px solid #e5e5e5;
+    vertical-align: middle;
+    margin-right: 8px;
+    background: #f4f4f4;
+}
+
+.res-title {
+    color: #333;
+    text-decoration: none;
+    vertical-align: middle;
+}
+
+.res-title:hover {
+    color: #6a0dad;
+    text-decoration: underline;
+}

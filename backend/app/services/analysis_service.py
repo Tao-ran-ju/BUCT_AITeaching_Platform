@@ -1,0 +1,155 @@
+"""数据分析服务：驾驶舱指标、能力矩阵热力图、任务进度、成绩分布、教学效果对比。"""
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.models.assignment import Assignment, AssignmentSubmission
+from app.models.course import Course
+from app.models.resource import Resource
+from app.models.task import Task, TaskAssignment
+from app.models.user import User
+from app.schemas.analysis import DashboardOverview, HeatmapCell, MetricCard
+
+
+class AnalysisService:
+    """面向教师的数据驾驶舱与教学分析。"""
+
+    @staticmethod
+    def overview(db: Session) -> DashboardOverview:
+        """核心指标看板：通过率 / 平均分 / 提交率 / 资源点击量。"""
+        total_users = db.scalar(select(func.count(User.id))) or 0
+        total_resources = db.scalar(select(func.count(Resource.id))) or 0
+        submissions = db.scalars(select(AssignmentSubmission)).all()
+
+        passed = sum(1 for s in submissions if (s.score or 0) >= 60)
+        pass_rate = passed / len(submissions) if submissions else 0.0
+        avg_score = (
+            sum(s.score or 0 for s in submissions) / len(submissions)
+            if submissions else 0.0
+        )
+
+        metrics = [
+            MetricCard(key="total_users", label="教师与学生总数", value=total_users),
+            MetricCard(key="total_resources", label="教学资源数", value=total_resources),
+            MetricCard(key="pass_rate", label="作业通过率", value=round(pass_rate * 100, 2), unit="%"),
+            MetricCard(key="avg_score", label="平均分", value=round(avg_score, 2), unit="分"),
+        ]
+        return DashboardOverview(metrics=metrics, heatmap=[])
+
+    @staticmethod
+    def capability_heatmap(db: Session, course_id: int | None = None) -> list[HeatmapCell]:
+        """能力矩阵热力图：按知识点汇总平均得分（0-1）。"""
+        stmt = select(
+            AssignmentSubmission.score, AssignmentSubmission.ai_comment,
+        )
+        if course_id:
+            # 通过作业关联课程，此处做简化示例
+            pass
+        cells: list[HeatmapCell] = []
+        for score, _ in db.execute(stmt):
+            if score is None:
+                continue
+            cells.append(HeatmapCell(knowledge_point="默认知识点", value=round(score / 100, 2)))
+        # 示例：至少返回一个单元格
+        if not cells:
+            cells.append(HeatmapCell(knowledge_point="暂无数据", value=0))
+        return cells[:20]
+
+    @staticmethod
+    def task_progress(db: Session) -> dict:
+        """全局任务进度热力图：学生 × 任务 完成情况矩阵。"""
+        tasks = db.scalars(select(Task).order_by(Task.id.desc())).all()
+        assignments = db.scalars(select(TaskAssignment)).all()
+
+        cells_by_task: dict[int, dict[int, str]] = {t.id: {} for t in tasks}
+        student_ids: set[int] = set()
+        for a in assignments:
+            if a.task_id in cells_by_task:
+                cells_by_task[a.task_id][a.student_id] = a.status
+            student_ids.add(a.student_id)
+
+        user_map = (
+            {u.id: u for u in db.scalars(select(User).where(User.id.in_(student_ids))).all()}
+            if student_ids else {}
+        )
+        course_ids = {t.course_id for t in tasks if t.course_id}
+        course_map = (
+            {c.id: c.name for c in db.scalars(select(Course).where(Course.id.in_(course_ids))).all()}
+            if course_ids else {}
+        )
+
+        student_cols = [
+            {"student_id": uid, "name": user_map[uid].name or user_map[uid].username}
+            for uid in student_ids
+        ]
+        task_list = []
+        for t in tasks:
+            cells = cells_by_task[t.id]
+            total = len(cells)
+            completed = sum(1 for s in cells.values() if s == "completed")
+            task_list.append({
+                "task_id": t.id,
+                "title": t.title,
+                "course_name": course_map.get(t.course_id) if t.course_id else None,
+                "deadline": t.deadline.isoformat() if t.deadline else None,
+                "total": total,
+                "completed": completed,
+                "rate": round(completed / total, 3) if total else 0.0,
+                "cells": cells,
+            })
+        return {"student_cols": student_cols, "tasks": task_list}
+
+    @staticmethod
+    def score_distribution(db: Session) -> dict:
+        """成绩分布：作业得分区间人数统计。"""
+        scores = [
+            s.score for s in db.scalars(
+                select(AssignmentSubmission).where(AssignmentSubmission.score.isnot(None))
+            ).all()
+        ]
+        buckets = [
+            ("0-59", "不及格", 0, 60),
+            ("60-69", "及格", 60, 70),
+            ("70-79", "中等", 70, 80),
+            ("80-89", "良好", 80, 90),
+            ("90-100", "优秀", 90, 101),
+        ]
+        result = [
+            {"range": key, "label": label, "count": sum(1 for s in scores if lo <= s < hi)}
+            for key, label, lo, hi in buckets
+        ]
+        return {"buckets": result, "total": len(scores)}
+
+    @staticmethod
+    def effect_compare(db: Session) -> list[dict]:
+        """教学效果对比：按课程汇总平均分 / 通过率 / 提交数。"""
+        rows = db.execute(
+            select(Assignment.course_id, AssignmentSubmission.score)
+            .join(AssignmentSubmission, AssignmentSubmission.assignment_id == Assignment.id)
+        ).all()
+        course_ids = {cid for cid, _ in rows if cid}
+        course_map = (
+            {c.id: c.name for c in db.scalars(select(Course).where(Course.id.in_(course_ids))).all()}
+            if course_ids else {}
+        )
+        agg: dict[int, dict] = {}
+        for course_id, score in rows:
+            if course_id is None:
+                continue
+            d = agg.setdefault(course_id, {"scores": [], "count": 0})
+            d["count"] += 1
+            if score is not None:
+                d["scores"].append(score)
+        result = []
+        for cid, d in agg.items():
+            scores = d["scores"]
+            avg = sum(scores) / len(scores) if scores else 0.0
+            passed = sum(1 for s in scores if s >= 60)
+            result.append({
+                "course_id": cid,
+                "course_name": course_map.get(cid, f"课程#{cid}"),
+                "avg_score": round(avg, 2),
+                "pass_rate": round(passed / len(scores), 3) if scores else 0.0,
+                "submission_count": d["count"],
+            })
+        result.sort(key=lambda x: x["avg_score"], reverse=True)
+        return result

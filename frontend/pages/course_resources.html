@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="北京化工大学AI教师管理端，一站式教师服务平台">
+    <meta name="keywords" content="管理平台,教师,智能体,北京化工大学,BUCT">
+    <title>北化AI教师管理端-课程资源</title>
+    <link rel="shortcut icon" href="../favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="../css/base.css">
+    <link rel="stylesheet" href="../css/common.css">
+    <link rel="stylesheet" href="../css/pages/course_resources.css">
+</head>
+<body>
+    <div class="shortcut">
+        <div class="wrapper" style="position: relative;">
+            <img src="../assets/images/buct.png" alt="">
+            <img src="../assets/images/college_of_information_science_and_technology.png" alt="" style="margin:0 25px; max-width: 90%; max-height: 90%; display: block; margin-top: 2.6px;">
+            <span style="line-height: 52px; font-family: 'STXingkai', '华文行楷', sans-serif; font-weight:700; font-size: 40px;">教师端在线</span>
+            <ul style="margin-left: auto;">
+                <li><a href="../index.html">网站主页</a></li>
+                <li><a href="./course_resources.html">课程资源</a></li>
+                <li><a href="./class_management.html">班级管理</a></li>
+                <li><a href="./aigc.html">备课中心</a></li>
+                <li><a href="./homework_correction.html">作业批改</a></li>
+                <li><a href="./message_queue.html">消息队列</a></li>
+                <li><a href="./personal_setting.html">个人设置</a></li>
+            </ul>
+            <div class="underline" style="position: absolute;bottom:8px;height:2px;background:blue;transition:0.3s; width:65px"></div>
+        </div>
+    </div>
+
+    <div class="wrapper page-body">
+        <!-- 页面标题 -->
+        <div class="page-header">
+            <h2>课程与资源管理</h2>
+            <p>管理课程生命周期、章-节-知识点三级结构，以及多格式教学资源的上传与权限。</p>
+        </div>
+
+        <div class="cr-layout">
+            <!-- 左栏：课程结构 -->
+            <div class="cr-left">
+                <!-- 课程列表 -->
+                <section class="panel">
+                    <div class="panel-head">
+                        <h3>课程列表</h3>
+                        <button class="btn small" id="btnNewCourse">+ 新建课程</button>
+                    </div>
+                    <div class="panel-body">
+                        <ul class="course-list" id="courseList"></ul>
+                    </div>
+                </section>
+
+                <!-- 章节目录 -->
+                <section class="panel">
+                    <div class="panel-head">
+                        <h3>章节目录 <span class="muted" id="chapterCourseHint"></span></h3>
+                        <button class="btn small" id="btnNewChapter">+ 新建章节</button>
+                    </div>
+                    <div class="panel-body">
+                        <ul class="tree-list" id="chapterList"></ul>
+                    </div>
+                </section>
+
+                <!-- 知识点 -->
+                <section class="panel">
+                    <div class="panel-head">
+                        <h3>知识点 <span class="muted" id="kpChapterHint"></span></h3>
+                        <button class="btn small" id="btnNewKp">+ 新建知识点</button>
+                    </div>
+                    <div class="panel-body">
+                        <ul class="tree-list" id="kpList"></ul>
+                    </div>
+                </section>
+            </div>
+
+            <!-- 右栏：教学资源 -->
+            <div class="cr-right">
+                <section class="panel">
+                    <div class="panel-head">
+                        <h3>上传教学资源</h3>
+                    </div>
+                    <div class="panel-body">
+                        <form id="uploadForm" class="upload-form">
+                            <div class="form-row">
+                                <label class="form-label">资源标题</label>
+                                <input type="text" class="form-input" id="resTitle" placeholder="请输入资源标题">
+                            </div>
+                            <div class="form-row">
+                                <label class="form-label">选择文件</label>
+                                <input type="file" class="form-input" id="resFile">
+                            </div>
+                            <div class="form-row">
+                                <label class="form-label">所属课程</label>
+                                <select class="form-select" id="resCourse"></select>
+                            </div>
+                            <button type="submit" class="btn">上传资源</button>
+                        </form>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-head">
+                        <h3>资源列表 <span class="muted" id="resHint"></span></h3>
+                    </div>
+                    <div class="panel-body">
+                        <table class="table" id="resourceTable">
+                            <thead>
+                                <tr>
+                                    <th>标题</th>
+                                    <th>类型</th>
+                                    <th>大小</th>
+                                    <th>可见性</th>
+                                    <th>摘要 / 标签</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通用模态框 -->
+    <div class="modal-mask" id="modalMask">
+        <div class="modal">
+            <div class="modal-head">
+                <h3 id="modalTitle">标题</h3>
+                <span class="modal-close" id="modalClose">&times;</span>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-foot">
+                <button class="btn secondary" id="modalCancel">取消</button>
+                <button class="btn" id="modalOk">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../assets/lib/axios.min.js"></script>
+    <script src="../js/pages/api.js"></script>
+    <script src="../js/pages/common.js"></script>
+    <script src="../js/pages/course_resources.js"></script>
+</body>
+</html>
