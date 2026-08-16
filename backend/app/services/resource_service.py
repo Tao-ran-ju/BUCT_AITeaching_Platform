@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.exceptions import ForbiddenError, NotFoundError
+from app.clients.oss_client import oss_client
 from app.models.resource import Resource
 from app.models.user import User
 from app.services.llm_teaching_service import LLMTeachingService
@@ -59,6 +60,29 @@ class ResourceService:
         return duration, (frames[0] if frames else None), transcoded
 
     @staticmethod
+    def _mirror_to_oss(resource: Resource, thumbnail_path: str | None,
+                       transcoded_path: str | None) -> None:
+        """把原文件及视频产物镜像到 OSS；任一失败仅告警，oss_key 保持 None 以回退本地。
+
+        object key 复用本地相对路径（key == file_path），便于服务端按路径直接签名。
+        """
+        if not oss_client.enabled:
+            return
+        paths = [resource.file_path]
+        if thumbnail_path:
+            paths.append(thumbnail_path)
+        if transcoded_path:
+            paths.append(transcoded_path)
+        ok_all = True
+        for p in paths:
+            if not Path(p).exists():
+                continue
+            if not oss_client.upload_file(p, p):
+                ok_all = False
+        if ok_all:
+            resource.oss_key = resource.file_path
+
+    @staticmethod
     def upload(db: Session, user: User, title: str, file, course_id: int | None) -> Resource:
         """保存上传文件并写入资源记录。"""
         sub_dir = f"course/{course_id}" if course_id else f"user/{user.id}"
@@ -94,6 +118,7 @@ class ResourceService:
             thumbnail_path=thumbnail_path,
             transcoded_path=transcoded_path,
         )
+        ResourceService._mirror_to_oss(resource, thumbnail_path, transcoded_path)
         db.add(resource)
         db.commit()
         db.refresh(resource)
@@ -139,5 +164,17 @@ class ResourceService:
         resource = ResourceService.get_resource(db, resource_id, user)
         if resource.uploader_id != user.id and user.role != "admin":
             raise ForbiddenError("仅资源上传者可删除")
+        # 清理存储：本地磁盘 + OSS（原文件/缩略图/转码产物）
+        for rel in (resource.file_path, resource.thumbnail_path, resource.transcoded_path):
+            if not rel:
+                continue
+            if oss_client.enabled:
+                oss_client.delete(rel)
+            try:
+                p = Path(rel)
+                if p.is_file():
+                    p.unlink()
+            except OSError:
+                pass
         db.delete(resource)
         db.commit()

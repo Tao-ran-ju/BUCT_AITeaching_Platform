@@ -5,7 +5,8 @@
  * 约定：后端统一响应 { code, message, data }；code === 0 视为成功。
  *
  * 说明：
- *  - 默认请求地址指向本机 FastAPI（http://127.0.0.1:8000/api/v1）。
+ *  - 线上同源部署（nginx 反代 /api）时默认走相对路径 /api/v1；
+ *    本地以 file:// 直开页面时才回退到本机 FastAPI（http://127.0.0.1:8000/api/v1）。
  *  - 登录 token 存于 localStorage（key: buct_access_token），请求时自动注入。
  *  - 所有方法都返回 Promise<data>；请求失败（未登录 / 后端未启动 / 网络错误）
  *    时，调用方可使用 api.request(promise, fallback) 优雅回退到演示数据。
@@ -16,7 +17,10 @@
 (function (global) {
     'use strict';
 
-    var DEFAULT_BASE_URL = 'http://127.0.0.1:8000/api/v1';
+    // 线上同源部署（nginx 反代）时用相对路径；本地 file:// 直开时回退到本机后端
+    var DEFAULT_BASE_URL = (location.protocol === 'http:' || location.protocol === 'https:')
+        ? '/api/v1'
+        : 'http://127.0.0.1:8000/api/v1';
     var TOKEN_KEY = 'buct_access_token';
 
     var BASE_URL = localStorage.getItem('apiBaseUrl') || DEFAULT_BASE_URL;
@@ -133,6 +137,8 @@
         listResources: function (params) { return http.get('/resources', { params: params }); },
         setResourceVisibility: function (id, visibility) { return http.patch('/resources/' + id + '/visibility', { visibility: visibility }); },
         deleteResource: function (id) { return http.delete('/resources/' + id); },
+        getResourceFile: function (id, kind) { return http.get('/resources/' + id + '/file', { params: { kind: kind } }); },
+        getResourcePreview: function (id) { return http.get('/resources/' + id + '/preview'); },
 
         // 作业
         listAssignments: function (courseId) { return http.get('/assignments', { params: { course_id: courseId } }); },

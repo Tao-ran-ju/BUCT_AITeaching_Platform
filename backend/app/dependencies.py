@@ -1,5 +1,5 @@
 """全局依赖：数据库会话、当前登录用户、可选用户、超级管理员。"""
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -20,6 +20,33 @@ def get_current_user(
         raise AuthError("缺少登录凭证")
     token = authorization.removeprefix("Bearer ").strip()
     payload = decode_token(token)
+    if not payload:
+        raise AuthError("登录已过期，请重新登录")
+
+    user = db.get(User, payload.get("uid"))
+    if not user or user.status != "active":
+        raise AuthError("账号不存在或已禁用")
+    return user
+
+
+def get_current_user_via_token(
+    db: Session = Depends(get_db),
+    authorization: str = Header(default=""),
+    token: str = Query(default=""),
+) -> User:
+    """解析用户身份，支持 Authorization 头或 ?token= 查询参数。
+
+    浏览器 <img>/<a> 标签无法携带 Authorization 头，故文件下载/缩略图直链需把
+    JWT 放进 ?token= 查询参数。校验逻辑与 get_current_user 完全一致。
+    """
+    raw = ""
+    if authorization.startswith("Bearer "):
+        raw = authorization.removeprefix("Bearer ").strip()
+    elif token:
+        raw = token.strip()
+    if not raw:
+        raise AuthError("缺少登录凭证")
+    payload = decode_token(raw)
     if not payload:
         raise AuthError("登录已过期，请重新登录")
 

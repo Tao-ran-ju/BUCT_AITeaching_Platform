@@ -23,4 +23,5 @@ class Resource(Base):
     duration: Mapped[float | None] = mapped_column(Float, comment="音视频时长（秒）")
     thumbnail_path: Mapped[str | None] = mapped_column(String(255), comment="视频关键帧缩略图相对路径")
     transcoded_path: Mapped[str | None] = mapped_column(String(255), comment="转码后 Web 兼容视频相对路径")
+    oss_key: Mapped[str | None] = mapped_column(String(255), comment="已镜像到 OSS 的 object key（== file_path）；null 表示仅本地")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

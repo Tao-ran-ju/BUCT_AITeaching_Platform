@@ -105,6 +105,22 @@
         return origin ? origin + clean : clean;
     }
 
+    // 资源文件的直链地址（302 到 OSS 签名 URL 或本地 /uploads）。
+    // 浏览器 <img>/<a> 无法携带 Authorization 头，故把 JWT 放进 ?token= 查询参数。
+    function resourceFileUrl(r, kind) {
+        var base = (window.api && api.BASE_URL) || '/api/v1';
+        base = base.replace(/\/+$/, '');
+        var url = base + '/resources/' + r.id + '/file?kind=' + encodeURIComponent(kind || 'original');
+        var token = localStorage.getItem('buct_access_token');
+        if (token) url += '&token=' + encodeURIComponent(token);
+        return url;
+    }
+
+    // 可在线预览的资源类型（对应后端 /resources/{id}/preview 的支持范围）
+    function canPreview(r) {
+        return ['document', 'video', 'audio', 'image'].indexOf(r.resource_type) >= 0;
+    }
+
     function courseStatusLabel(status) {
         if (status === 'draft') return '草稿';
         if (status === 'archived') return '已归档';
@@ -627,9 +643,9 @@
             var titleCell = esc(r.title);
             if (r.resource_type === 'video') {
                 var thumb = r.thumbnail_path
-                    ? '<img class="res-thumb" src="' + esc(fullUrl(r.thumbnail_path)) + '" alt="">'
+                    ? '<img class="res-thumb" src="' + esc(resourceFileUrl(r, 'thumbnail')) + '" alt="">'
                     : '';
-                var href = fullUrl(r.transcoded_path || r.file_path);
+                var href = resourceFileUrl(r, r.transcoded_path ? 'transcoded' : 'original');
                 titleCell = thumb +
                     '<a class="res-title" href="' + esc(href) + '" target="_blank" title="点击播放">' + esc(r.title) + '</a>';
             }
@@ -643,7 +659,9 @@
                     return '<option value="' + v + '"' + (r.visibility === v ? ' selected' : '') + '>' + VIS_LABEL[v] + '</option>';
                 }).join('') + '</select></td>' +
                 '<td>' + annot + '</td>' +
-                '<td><button class="btn danger small" data-act="del">删除</button></td>' +
+                '<td><div class="actions">' +
+                (canPreview(r) ? '<button class="btn secondary small" data-act="preview">预览</button>' : '') +
+                '<button class="btn danger small" data-act="del">删除</button></div></td>' +
                 '</tr>';
         }).join('');
 
@@ -652,8 +670,11 @@
             tr.querySelectorAll('[data-act]').forEach(function (el) {
                 el.addEventListener('click', function (e) {
                     e.stopPropagation();
-                    if (el.getAttribute('data-act') === 'del') {
+                    var act = el.getAttribute('data-act');
+                    if (act === 'del') {
                         deleteResource(id);
+                    } else if (act === 'preview') {
+                        previewResource(id);
                     }
                 });
                 el.addEventListener('change', function () {
@@ -693,6 +714,18 @@
             DEMO.resources = DEMO.resources.filter(function (r) { return r.id !== id; });
             showToast('演示模式：资源已本地删除');
             syncDemoResources();
+        }
+    }
+
+    // 在线预览：后端返回 { url, kind }（OSS 签名 URL 或本地 /uploads），浏览器新标签打开。
+    async function previewResource(id) {
+        try {
+            var data = await api.getResourcePreview(id);
+            var url = data && data.url;
+            if (!url) { showToast('该资源暂不支持预览', 'error'); return; }
+            window.open(fullUrl(url), '_blank');
+        } catch (e) {
+            showToast('预览失败：' + ((e && e.message) || '未知错误'), 'error');
         }
     }
 

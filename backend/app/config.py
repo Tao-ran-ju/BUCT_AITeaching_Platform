@@ -53,6 +53,15 @@ class Settings(BaseSettings):
     FFPROBE_PATH: str = "ffprobe"
     MAX_VIDEO_TRANSCODE_MB: int = 500
 
+    # ---------- 阿里云 OSS（对象存储 + 文档预览，可选） ----------
+    OSS_ENABLED: bool = False
+    OSS_ACCESS_KEY_ID: str = ""
+    OSS_ACCESS_KEY_SECRET: str = ""
+    OSS_BUCKET: str = ""
+    OSS_ENDPOINT: str = ""
+    OSS_REGION: str = ""
+    OSS_URL_EXPIRES: int = 3600
+
     # ---------- 学情预警阈值 ----------
     WARNING_SUBMIT_DELAY_DAYS: int = 3
     WARNING_ABSENT_DAYS: int = 3
