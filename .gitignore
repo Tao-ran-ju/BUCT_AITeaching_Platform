@@ -27,6 +27,10 @@ backend/scripts/legacy/
 *.log
 backend/logs/
 
+# ===== 前端构建（Vite） =====
+frontend/node_modules/
+frontend/dist/
+
 # ===== 系统 =====
 .DS_Store
 Thumbs.db

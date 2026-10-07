@@ -1,0 +1,50 @@
+/* ========== 设计令牌（品牌紫色系） ========== */
+:root {
+  --brand-primary: #6a0dad;
+  --brand-purple: #800080;
+  --brand-primary-light: #f3e8ff;
+  --brand-primary-border: #e0c6ff;
+  --brand-danger: #e94560;
+  --brand-success: #2e7d32;
+  --brand-warning: #f9a825;
+  --brand-info: #1565c0;
+  --brand-private: #6d4c41;
+  --text-main: #333;
+  --text-secondary: #555;
+  --text-muted: #999;
+  --border-strong: #d0d0d0;
+  --border-normal: #e5e5e5;
+  --border-light: #eee;
+  --bg-track: #fafafa;
+}
+
+/* 去除常见标签默认的 margin/padding */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* 统一字体 */
+body {
+  font: 16px/1.5 "Microsoft Yahei", "Hiragino Sans GB", "Heiti SC", "WenQuanYi Micro Hei", sans-serif;
+  color: #333;
+}
+
+ul, ol {
+  list-style: none;
+}
+
+em, i {
+  font-style: normal;
+}
+
+a {
+  text-decoration: none;
+  color: #333;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}

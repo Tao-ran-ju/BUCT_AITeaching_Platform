@@ -10,7 +10,7 @@
    │  http://<服务器 IP>/
    ▼
 nginx（80 端口）
-   ├── /            → 前端静态文件（frontend/ 目录）
+   ├── /            → 前端静态文件（frontend/dist 目录，Vite 构建产物）
    ├── /api/        → 反向代理到 uvicorn（127.0.0.1:8000）
    └── /uploads/    → 反向代理到 uvicorn（后端挂载的 StaticFiles）
                           │
@@ -21,7 +21,7 @@ nginx（80 端口）
                           └── 阿里云 OSS（可选，镜像 + 文档在线预览）
 ```
 
-前端 `api.js` 已改为**相对路径** `/api/v1`（同源部署），因此**必须**通过 nginx 同源反代，前端和后端要在同一个域名/IP 下。
+前端 API 层（`frontend/src/api/index.js`）使用**相对路径** `/api/v1`（同源部署），因此**必须**通过 nginx 同源反代，前端和后端要在同一个域名/IP 下。
 
 ---
 
@@ -33,6 +33,7 @@ nginx（80 端口）
 | 远程 MariaDB（学校 buct_cip 库） | 业务数据库（无需本地安装，走网络连接） |
 | ffmpeg / ffprobe | 视频转码、关键帧抽取（缺失不影响其它功能，仅视频后处理降级） |
 | nginx | 反向代理 + 静态资源托管 |
+| Node.js 18+ / npm | 前端构建（Vue3 + Vite） |
 | git | 拉取代码 |
 
 CentOS / TencentOS：
@@ -47,6 +48,15 @@ Ubuntu / Debian：
 
 ```bash
 sudo apt update && sudo apt install -y git nginx python3 python3-pip ffmpeg
+```
+
+Node.js 18+（前端构建用，推荐 nvm 或 NodeSource）：
+
+```bash
+# Ubuntu / Debian
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt install -y nodejs
+# CentOS / TencentOS
+curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash - && sudo yum install -y nodejs
 ```
 
 数据库使用学校已部署的远程 MariaDB（`buct_cip` 库），无需在服务器上安装 MySQL；只需保证服务器能连通数据库地址（见 3.1 的 `DB_HOST` / `DB_PORT`）。
@@ -66,7 +76,11 @@ git clone <你的仓库地址> .
 
 ```
 /opt/buct-ai-teaching/
-├── frontend/          # 前端静态文件（nginx 的 root）
+├── frontend/          # 前端源码（Vue3 + Vite；构建产物在 frontend/dist）
+│   ├── src/           # Vue 组件与逻辑（views / api / components 等）
+│   ├── public/        # 静态资源（favicon、images）
+│   ├── package.json   # 前端依赖与构建脚本
+│   └── dist/          # npm run build 产物（nginx 的 root）
 └── backend/           # 后端（uvicorn 的 WorkingDirectory）
     ├── main.py
     ├── requirements.txt
@@ -74,6 +88,18 @@ git clone <你的仓库地址> .
     ├── uploads/       # 上传文件（工作副本，可整体备份）
     └── scripts/       # create_teacher_tables.py / seed_admin.py / seed_study_behavior.py
 ```
+
+### 2.1 构建前端（首次部署 / 前端代码有更新时执行）
+
+前端已重构为 Vue 3 + Element Plus 单页应用（Vite 构建），部署前需构建一次：
+
+```bash
+cd /opt/buct-ai-teaching/frontend
+npm install          # 安装依赖（生成 node_modules/，已被 .gitignore 忽略）
+npm run build        # 产出 dist/（nginx 的 root）
+```
+
+> 本地开发用 `npm run dev`（内置 dev server，`/api`、`/uploads` 已代理到 `127.0.0.1:8000`）。
 
 ---
 
@@ -171,7 +197,7 @@ server {
     server_name 101.42.1.248;   # 换成你的 IP 或域名
 
     # ---- 前端静态资源 ----
-    root /opt/buct-ai-teaching/frontend;
+    root /opt/buct-ai-teaching/frontend/dist;
     index index.html;
 
     location / {
@@ -205,7 +231,7 @@ server {
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-> 说明：前端为多页应用（`pages/*.html` 是真实文件），因此 `/` 用 `try_files $uri $uri/ =404`；`/api/` 原样透传（后端 `API_PREFIX=/api/v1`）；`/uploads/` 交给后端 `StaticFiles` 提供，保证与 OSS 回退逻辑一致。
+> 说明：前端为 Vue3 单页应用（hash 路由），构建产物在 `frontend/dist`；`/` 用 `try_files $uri $uri/ =404`（hash 路由无需 SPA history 回退）；`/api/` 原样透传（后端 `API_PREFIX=/api/v1`）；`/uploads/` 交给后端 `StaticFiles` 提供，保证与 OSS 回退逻辑一致。
 
 ---
 
