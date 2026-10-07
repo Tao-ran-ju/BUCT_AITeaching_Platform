@@ -1,4 +1,5 @@
 """教学过程路由：主题讨论区（发帖 / 回复 / 列表 / 精华与置顶）。"""
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -12,6 +13,7 @@ from app.exceptions import NotFoundError
 from app.models.discussion import DiscussionPost, DiscussionReply
 from app.models.user import User
 from app.routers import ok
+from app.utils.serializers import iso_ts
 
 router = APIRouter(prefix="/discussions", tags=["教学过程"])
 
@@ -33,13 +35,18 @@ class PostFlagsUpdate(BaseModel):
     is_top: Optional[bool] = None
 
 
+def _now() -> int:
+    return int(time.time())
+
+
 def _post_out(p: DiscussionPost, author_name: str | None) -> dict:
     return {
-        "id": p.id, "course_id": p.course_id, "author_id": p.author_id,
+        "id": p.id, "course_id": p.course_id, "author_id": p.author_user_id,
         "author_name": author_name,
         "title": p.title, "content": p.content,
-        "is_top": p.is_top, "is_essence": p.is_essence,
-        "created_at": p.created_at.isoformat(),
+        "is_top": bool(p.is_pinned), "is_essence": bool(p.is_essence),
+        "is_pinned": p.is_pinned, "is_locked": p.is_locked,
+        "created_at": iso_ts(p.created_at),
     }
 
 
@@ -58,18 +65,23 @@ def list_posts(course_id: int, user: User = Depends(get_current_user),
     posts = db.scalars(
         select(DiscussionPost)
         .where(DiscussionPost.course_id == course_id)
-        .order_by(DiscussionPost.is_top.desc(), DiscussionPost.id.desc())
+        .order_by(DiscussionPost.is_pinned.desc(), DiscussionPost.id.desc())
     ).all()
-    name_map = _author_map(db, {p.author_id for p in posts})
-    return ok([_post_out(p, name_map.get(p.author_id)) for p in posts])
+    name_map = _author_map(db, {p.author_user_id for p in posts})
+    return ok([_post_out(p, name_map.get(p.author_user_id)) for p in posts])
 
 
 @router.post("", summary="发布帖子")
 def create_post(data: PostCreate, user: User = Depends(get_current_user),
                 db: Session = Depends(get_db)):
+    now = _now()
     post = DiscussionPost(
-        course_id=data.course_id, author_id=user.id,
-        title=data.title, content=data.content,
+        course_id=data.course_id,
+        author_user_id=user.id,
+        title=data.title,
+        content=data.content,
+        is_pinned=0, is_locked=0, is_essence=0, status=0,
+        created_at=now, edited_at=now,
     )
     db.add(post)
     db.commit()
@@ -85,9 +97,10 @@ def update_post_flags(post_id: int, data: PostFlagsUpdate,
     if not post:
         raise NotFoundError("帖子不存在")
     if data.is_essence is not None:
-        post.is_essence = data.is_essence
+        post.is_essence = 1 if data.is_essence else 0
     if data.is_top is not None:
-        post.is_top = data.is_top
+        post.is_pinned = 1 if data.is_top else 0
+    post.edited_at = _now()
     db.commit()
     db.refresh(post)
     return ok(_post_out(post, user.name))
@@ -113,11 +126,11 @@ def list_replies(post_id: int, user: User = Depends(get_current_user),
         .where(DiscussionReply.post_id == post_id)
         .order_by(DiscussionReply.id)
     ).all()
-    name_map = _author_map(db, {r.author_id for r in replies})
+    name_map = _author_map(db, {r.author_user_id for r in replies})
     return ok([{
-        "id": r.id, "post_id": r.post_id, "author_id": r.author_id,
-        "author_name": name_map.get(r.author_id),
-        "content": r.content, "created_at": r.created_at.isoformat(),
+        "id": r.id, "post_id": r.post_id, "author_id": r.author_user_id,
+        "author_name": name_map.get(r.author_user_id),
+        "content": r.content, "created_at": iso_ts(r.created_at),
     } for r in replies])
 
 
@@ -128,7 +141,15 @@ def create_reply(post_id: int, data: ReplyCreate,
     post = db.get(DiscussionPost, post_id)
     if not post:
         raise NotFoundError("帖子不存在")
-    reply = DiscussionReply(post_id=post_id, author_id=user.id, content=data.content)
+    now = _now()
+    reply = DiscussionReply(
+        post_id=post_id,
+        author_user_id=user.id,
+        content=data.content,
+        status=0,
+        created_at=now,
+        edited_at=now,
+    )
     db.add(reply)
     db.commit()
     db.refresh(reply)

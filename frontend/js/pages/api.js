@@ -23,6 +23,22 @@
         : 'http://127.0.0.1:8000/api/v1';
     var TOKEN_KEY = 'buct_access_token';
 
+    // SSO 免登：学生端网站登录后按角色跳转到教师端时会携带 ?token=<JWT>，
+    // 在此读取并写入 localStorage，后续所有请求自动注入；随后把 token 从地址栏抹掉。
+    (function readTokenFromUrl() {
+        try {
+            var params = new URLSearchParams(location.search);
+            var token = params.get('token');
+            if (token) {
+                localStorage.setItem(TOKEN_KEY, token);
+                params.delete('token');
+                var qs = params.toString();
+                var cleanUrl = location.pathname + (qs ? '?' + qs : '') + location.hash;
+                history.replaceState(null, '', cleanUrl);
+            }
+        } catch (e) { /* ignore */ }
+    })();
+
     var BASE_URL = localStorage.getItem('apiBaseUrl') || DEFAULT_BASE_URL;
 
     // 浏览器可能以 file:// 方式直接打开页面，此时无法注入 token，全部回退演示数据

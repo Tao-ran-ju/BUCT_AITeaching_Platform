@@ -1,47 +1,43 @@
-"""学习任务相关模型。"""
+"""班级任务相关模型（class_tasks / class_task_completions）。"""
 from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.common import Timestamp
+
 
 class TaskCreate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = None
-    task_type: str = Field("other", pattern="^(knowledge_point|oj|acdc|other)$")
+    class_id: int = Field(..., description="所属班级 ID")
+    task_type: str = Field("reading", description="reading/practice/project/lab")
+    content: str = Field(..., min_length=1)
     deadline: Optional[datetime] = None
-    course_id: Optional[int] = None
-    student_ids: list[int] = Field(..., min_length=1, description="指派学生 ID 列表")
 
 
 class TaskUpdate(BaseModel):
-    title: Optional[str] = Field(None, min_length=1, max_length=200)
-    description: Optional[str] = None
-    task_type: Optional[str] = Field(None, pattern="^(knowledge_point|oj|acdc|other)$")
+    task_type: Optional[str] = None
+    content: Optional[str] = None
     deadline: Optional[datetime] = None
 
 
-class TaskAssignmentOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class TaskCompletionOut(BaseModel):
     student_id: int
+    uid: str
     name: str
-    username: str
-    status: str
     completed_at: Optional[datetime] = None
+    completed: bool = False
 
 
 class TaskOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    course_id: Optional[int] = None
-    title: str
-    description: Optional[str] = None
+    class_id: int
     task_type: str
+    content: str
     deadline: Optional[datetime] = None
-    created_by: int
-    created_at: datetime
-    student_count: int = 0
+    status: int
+    created_by: Optional[str] = None
+    created_at: Timestamp
+    total_students: int = 0
     completed_count: int = 0
-    assignments: list[TaskAssignmentOut] = []

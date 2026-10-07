@@ -4,15 +4,17 @@
     1. 归一化文本（小写 + 按标识符/数字切词）
     2. 生成 3-gram shingle
     3. 每个 shingle 计算 64 位指纹，累加得到 simhash
-    4. 两两计算海明距离 → 相似度，写入每个提交的 plagiarism_rate
+    4. 两两计算海明距离 → 相似度，写入 t_submission_judge.plagiarism_rate
 """
 import hashlib
 import re
+import time
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.assignment import AssignmentSubmission
+from app.services.judge_service import get_or_create_judge
 
 _TOKEN_RE = re.compile(r"[a-z_][a-z0-9_]*|\d+")
 _SHINGLE_N = 3
@@ -32,10 +34,7 @@ def _shingles(tokens: list[str], n: int = _SHINGLE_N) -> list[tuple]:
 
 
 def _fingerprint(token) -> int:
-    """稳定 64 位指纹（md5，跨进程一致，不受 PYTHONHASHSEED 影响）。
-
-    token 既可能是单词（str），也可能是 shingle 元组（tuple），统一字符串化。
-    """
+    """稳定 64 位指纹（md5，跨进程一致，不受 PYTHONHASHSEED 影响）。"""
     s = token if isinstance(token, str) else "|".join(token)
     return int.from_bytes(hashlib.md5(s.encode("utf-8")).digest()[:8], "little")
 
@@ -86,7 +85,9 @@ class PlagiarismService:
         )
         if len(submissions) < 2:
             for s in submissions:
-                s.plagiarism_rate = 0.0
+                sj = get_or_create_judge(db, s)
+                sj.plagiarism_rate = 0.0
+                sj.edited_at = int(time.time())
             db.commit()
             return submissions
 
@@ -97,8 +98,8 @@ class PlagiarismService:
                 if i == j:
                     continue
                 best = max(best, similarity(fps[i], fps[j]))
-            s.plagiarism_rate = round(best, 3)
+            sj = get_or_create_judge(db, s)
+            sj.plagiarism_rate = round(best, 3)
+            sj.edited_at = int(time.time())
         db.commit()
-        for s in submissions:
-            db.refresh(s)
         return submissions

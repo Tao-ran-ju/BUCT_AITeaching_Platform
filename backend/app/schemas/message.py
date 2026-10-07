@@ -2,13 +2,11 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
 
 class MessageOut(BaseModel):
-    """教师端「已发送消息」出参（含接收统计）。"""
-
-    model_config = ConfigDict(from_attributes=True)
+    """教师端「已发送消息」出参（按广播分组，含接收统计）。"""
 
     id: int
     title: str
@@ -20,7 +18,7 @@ class MessageOut(BaseModel):
     attachment_url: Optional[str] = None
     attachment_name: Optional[str] = None
     attachment_size: Optional[int] = None
+    assignment_id: Optional[int] = None
     created_at: datetime
-    receiver_ids: list[int] = []
     receiver_count: int = 0
     unread_count: int = 0

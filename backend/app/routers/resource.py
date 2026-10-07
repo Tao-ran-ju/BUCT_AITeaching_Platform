@@ -11,7 +11,7 @@ from app.dependencies import get_current_user, get_current_user_via_token
 from app.exceptions import NotFoundError
 from app.models.user import User
 from app.routers import ok
-from app.schemas.resource import ResourceOut, ResourceVisibilityUpdate
+from app.schemas.resource import ResourceVisibilityUpdate
 from app.services.resource_service import ResourceService
 
 router = APIRouter(prefix="/resources", tags=["教学资源"])
@@ -22,10 +22,11 @@ _OFFICE_EXT = {".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"}
 
 def _rel_for_kind(resource, kind: str) -> str:
     """按 kind 取资源的相对存储路径；无对应产物时抛 404。"""
+    meta = ResourceService._load_meta(resource)
     if kind == "thumbnail":
-        rel = resource.thumbnail_path
+        rel = meta.get("thumbnail_path")
     elif kind == "transcoded":
-        rel = resource.transcoded_path
+        rel = meta.get("transcoded_path")
     else:
         rel = resource.file_path
     if not rel:
@@ -35,7 +36,8 @@ def _rel_for_kind(resource, kind: str) -> str:
 
 def _serve_url(resource, rel: str) -> str:
     """返回可访问地址：已镜像时用 OSS 签名 URL，否则回退本地 /uploads 相对路径。"""
-    if resource.oss_key and oss_client.enabled:
+    meta = ResourceService._load_meta(resource)
+    if meta.get("oss_key") and oss_client.enabled:
         url = oss_client.signed_url(rel)
         if url:
             return url
@@ -51,7 +53,7 @@ async def upload_resource(
     db: Session = Depends(get_db),
 ):
     resource = ResourceService.upload(db, user, title, file, course_id)
-    return ok(ResourceOut.model_validate(resource))
+    return ok(ResourceService._out(resource))
 
 
 @router.get("", summary="资源列表")
@@ -63,7 +65,7 @@ def list_resources(
     db: Session = Depends(get_db),
 ):
     result = ResourceService.list_resources(db, user, course_id, page, page_size)
-    result["items"] = [ResourceOut.model_validate(r) for r in result["items"]]
+    result["items"] = [ResourceService._out(r) for r in result["items"]]
     return ok(result)
 
 
@@ -72,7 +74,7 @@ def set_visibility(resource_id: int, data: ResourceVisibilityUpdate,
                    user: User = Depends(get_current_user),
                    db: Session = Depends(get_db)):
     resource = ResourceService.set_visibility(db, resource_id, user, data.visibility)
-    return ok(ResourceOut.model_validate(resource))
+    return ok(ResourceService._out(resource))
 
 
 @router.delete("/{resource_id}", summary="删除资源")
@@ -87,7 +89,7 @@ def get_resource_file(resource_id: int,
                       kind: str = Query("original", pattern="^(original|thumbnail|transcoded)$"),
                       user: User = Depends(get_current_user_via_token),
                       db: Session = Depends(get_db)):
-    resource = ResourceService.get_resource(db, resource_id, user)
+    resource = ResourceService.get_resource(db, resource_id)
     rel = _rel_for_kind(resource, kind)
     return RedirectResponse(url=_serve_url(resource, rel))
 
@@ -95,13 +97,14 @@ def get_resource_file(resource_id: int,
 @router.get("/{resource_id}/preview", summary="在线预览（返回预览 URL 与类型）")
 def preview_resource(resource_id: int, user: User = Depends(get_current_user),
                      db: Session = Depends(get_db)):
-    resource = ResourceService.get_resource(db, resource_id, user)
+    resource = ResourceService.get_resource(db, resource_id)
+    meta = ResourceService._load_meta(resource)
     rel = resource.file_path
     ext = ("." + rel.rsplit(".", 1)[-1].lower()) if "." in rel else ""
-    rt = resource.resource_type
+    rt = resource.type  # document/image/video/audio/code/other
 
     if rt == "video":
-        play = resource.transcoded_path or rel  # 优先 H.264 转码产物
+        play = meta.get("transcoded_path") or rel  # 优先 H.264 转码产物
         return ok({"url": _serve_url(resource, play), "kind": "video"})
     if rt == "audio":
         return ok({"url": _serve_url(resource, rel), "kind": "audio"})
@@ -111,7 +114,7 @@ def preview_resource(resource_id: int, user: User = Depends(get_current_user),
         return ok({"url": _serve_url(resource, rel), "kind": "pdf"})
     if ext in _OFFICE_EXT:
         # Office 文档：尝试 IMM 转 PDF 在线预览，失败回退下载
-        if resource.oss_key and oss_client.enabled:
+        if meta.get("oss_key") and oss_client.enabled:
             url = oss_client.office_to_pdf(rel)
             if url:
                 return ok({"url": url, "kind": "pdf"})

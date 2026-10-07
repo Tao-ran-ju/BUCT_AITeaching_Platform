@@ -15,6 +15,7 @@ python-dotenv>=1.0
 
 # ===== 鉴权 =====
 PyJWT>=2.8
+bcrypt>=4.0
 
 # ===== 文件上传 =====
 python-multipart>=0.0.9

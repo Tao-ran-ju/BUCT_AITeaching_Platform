@@ -1,25 +1,20 @@
-"""课程 / 章节 / 知识点相关模型。"""
-from datetime import datetime
-from typing import Optional
+"""课程 / 知识图谱相关模型。"""
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.common import Timestamp
+
 
 class CourseCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=128)
-    code: Optional[str] = None
-    cover: Optional[str] = None
+    name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
-    open_time: Optional[datetime] = None
 
 
 class CourseUpdate(BaseModel):
-    name: Optional[str] = None
-    code: Optional[str] = None
-    cover: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = None
-    open_time: Optional[datetime] = None
-    status: Optional[str] = Field(None, pattern="^(draft|published|archived)$")
+    status: Optional[int] = Field(None, description="0=草稿 1=已发布 100=已归档")
 
 
 class CourseOut(BaseModel):
@@ -27,58 +22,24 @@ class CourseOut(BaseModel):
 
     id: int
     name: str
-    code: Optional[str] = None
-    cover: Optional[str] = None
     description: Optional[str] = None
-    open_time: Optional[datetime] = None
-    teacher_id: int
-    status: str
-    created_at: datetime
+    teacher_user_id: int
+    status: int
+    created_by: Optional[str] = None
+    legacy_id: Optional[str] = None
+    created_at: Timestamp
+    edited_at: Timestamp
 
 
-class ChapterCreate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=128)
-    description: Optional[str] = None
-    sort_order: int = 0
-
-
-class ChapterUpdate(BaseModel):
-    title: Optional[str] = Field(None, min_length=1, max_length=128)
-    description: Optional[str] = None
-    sort_order: Optional[int] = None
-
-
-class ChapterOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class KnowledgeGraphOut(BaseModel):
+    """课程知识图谱出参（graph_data 已解析为 dict）。"""
 
     id: int
     course_id: int
-    title: str
-    description: Optional[str] = None
-    sort_order: int
+    graph_data: Any
+    created_at: Timestamp
+    edited_at: Timestamp
 
 
-class KnowledgePointCreate(BaseModel):
-    chapter_id: int
-    parent_id: Optional[int] = None
-    name: str = Field(..., min_length=1, max_length=128)
-    description: Optional[str] = None
-    sort_order: int = 0
-
-
-class KnowledgePointUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=128)
-    description: Optional[str] = None
-    sort_order: Optional[int] = None
-
-
-class KnowledgePointOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    chapter_id: int
-    parent_id: Optional[int] = None
-    name: str
-    description: Optional[str] = None
-    ai_summary: Optional[str] = None
-    sort_order: int
+class KnowledgeGraphUpsert(BaseModel):
+    graph_data: dict = Field(..., description="知识图谱 JSON（nodes/edges）")

@@ -1,30 +1,37 @@
-"""主题讨论区表：帖子 + 回复。"""
-from datetime import datetime
-
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+"""主题讨论区模型（教师端自有表）：帖子 + 回复。"""
+from sqlalchemy import BigInteger, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
 
 class DiscussionPost(Base):
-    __tablename__ = "discussion_post"
+    """讨论区帖子（t_discussion_post）。"""
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    course_id: Mapped[int] = mapped_column(ForeignKey("course.id"), index=True)
-    author_id: Mapped[int] = mapped_column(ForeignKey("user.id"), index=True)
-    title: Mapped[str] = mapped_column(String(128))
-    content: Mapped[str | None] = mapped_column(Text)
-    is_top: Mapped[bool] = mapped_column(Boolean, default=False, comment="置顶")
-    is_essence: Mapped[bool] = mapped_column(Boolean, default=False, comment="精华")
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    __tablename__ = "t_discussion_post"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    course_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True, comment="课程 ID")
+    author_user_id: Mapped[int] = mapped_column(Integer, nullable=False, comment="作者 user_rft.id")
+    title: Mapped[str] = mapped_column(String(200), nullable=False, comment="帖子标题")
+    content: Mapped[str] = mapped_column(Text, nullable=False, comment="帖子正文")
+    is_pinned: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="0=否 1=置顶")
+    is_locked: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="0=否 1=锁定")
+    is_essence: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="0=否 1=精华")
+    status: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="0=正常")
+    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="创建时间")
+    edited_at: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="最后编辑时间")
 
 
 class DiscussionReply(Base):
-    __tablename__ = "discussion_reply"
+    """讨论区回复（t_discussion_reply）。"""
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    post_id: Mapped[int] = mapped_column(ForeignKey("discussion_post.id"), index=True)
-    author_id: Mapped[int] = mapped_column(ForeignKey("user.id"))
-    content: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    __tablename__ = "t_discussion_reply"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    post_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True, comment="帖子 ID")
+    author_user_id: Mapped[int] = mapped_column(Integer, nullable=False, comment="作者 user_rft.id")
+    content: Mapped[str] = mapped_column(Text, nullable=False, comment="回复内容")
+    status: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="0=正常")
+    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="创建时间")
+    edited_at: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="最后编辑时间")

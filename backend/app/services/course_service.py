@@ -1,15 +1,23 @@
-"""课程服务：课程 / 章节 / 知识点 CRUD。"""
-from sqlalchemy import delete, select
+"""课程服务：课程 CRUD + 知识图谱。"""
+import json
+import time
+
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.exceptions import NotFoundError
-from app.models.course import Chapter, Course, KnowledgePoint
+from app.models.course import Course, KnowledgeGraph
+from app.models.user import User
 from app.schemas.course import CourseCreate, CourseUpdate
 from app.utils.pagination import normalize_page, paginate
 
 
 class CourseService:
-    """课程及其组织结构（章-节-知识点）业务逻辑。"""
+    """课程及其知识图谱业务逻辑。"""
+
+    @staticmethod
+    def _now() -> int:
+        return int(time.time())
 
     # ---------- 课程 ----------
     @staticmethod
@@ -18,7 +26,7 @@ class CourseService:
         page, page_size = normalize_page(page, page_size)
         stmt = select(Course)
         if teacher_id is not None:
-            stmt = stmt.where(Course.teacher_id == teacher_id)
+            stmt = stmt.where(Course.teacher_user_id == teacher_id)
         total = len(db.scalars(stmt).all())
         rows = db.scalars(
             stmt.order_by(Course.id.desc()).offset((page - 1) * page_size).limit(page_size)
@@ -33,8 +41,16 @@ class CourseService:
         return course
 
     @staticmethod
-    def create_course(db: Session, teacher_id: int, data: CourseCreate) -> Course:
-        course = Course(**data.model_dump(), teacher_id=teacher_id)
+    def create_course(db: Session, teacher: User, data: CourseCreate) -> Course:
+        course = Course(
+            name=data.name,
+            description=data.description,
+            teacher_user_id=teacher.id,
+            status=0,
+            created_at=CourseService._now(),
+            edited_at=CourseService._now(),
+            created_by=teacher.uid,
+        )
         db.add(course)
         db.commit()
         db.refresh(course)
@@ -45,174 +61,84 @@ class CourseService:
         course = CourseService.get_course(db, course_id)
         for field, value in data.model_dump(exclude_unset=True).items():
             setattr(course, field, value)
+        course.edited_at = CourseService._now()
         db.commit()
         db.refresh(course)
         return course
 
     @staticmethod
     def delete_course(db: Session, course_id: int) -> None:
+        """软删除：status=100 归档（学校表用 100 表示归档/删除）。"""
         course = CourseService.get_course(db, course_id)
-        db.delete(course)
+        course.status = 100
+        course.edited_at = CourseService._now()
         db.commit()
 
     @staticmethod
-    def set_status(db: Session, course_id: int, status: str) -> Course:
-        """归档 / 发布课程（draft / published / archived）。"""
+    def set_status(db: Session, course_id: int, status: int) -> Course:
+        """发布（1）/ 归档（100）/ 回到草稿（0）。"""
         course = CourseService.get_course(db, course_id)
         course.status = status
+        course.edited_at = CourseService._now()
         db.commit()
         db.refresh(course)
         return course
 
     @staticmethod
-    def set_cover(db: Session, course_id: int, cover: str) -> Course:
-        """设置课程封面图路径。"""
-        course = CourseService.get_course(db, course_id)
-        course.cover = cover
-        db.commit()
-        db.refresh(course)
-        return course
-
-    @staticmethod
-    def clone_course(db: Session, course_id: int, teacher_id: int) -> Course:
-        """克隆课程：复制课程元信息，并深拷贝章-节-知识点树。
-
-        新课程为「草稿」状态，编号追加「(副本)」，方便教师二次编辑后发布。
-        """
+    def clone_course(db: Session, course_id: int, teacher: User) -> Course:
+        """克隆课程：复制课程元信息 + 知识图谱，新课程为草稿。"""
         src = CourseService.get_course(db, course_id)
         cloned = Course(
             name=f"{src.name}（副本）",
-            code=(f"{src.code}（副本）" if src.code else None),
-            cover=src.cover,
             description=src.description,
-            open_time=src.open_time,
-            teacher_id=teacher_id,
-            status="draft",
+            teacher_user_id=teacher.id,
+            status=0,
+            created_at=CourseService._now(),
+            edited_at=CourseService._now(),
+            created_by=teacher.uid,
         )
         db.add(cloned)
         db.flush()  # 取得 cloned.id
-
-        # 第一遍：复制章节与知识点（暂不设父子关系）
-        kp_map: dict[int, int] = {}      # 旧知识点 id -> 新知识点 id
-        kp_rows: list[tuple[KnowledgePoint, int | None]] = []  # (新知识点, 旧 parent_id)
-        for ch in CourseService.list_chapters(db, course_id):
-            new_ch = Chapter(
+        graph = db.scalar(select(KnowledgeGraph).where(KnowledgeGraph.course_id == course_id))
+        if graph:
+            db.add(KnowledgeGraph(
                 course_id=cloned.id,
-                title=ch.title,
-                description=ch.description,
-                sort_order=ch.sort_order,
-            )
-            db.add(new_ch)
-            db.flush()
-            for kp in CourseService.list_knowledge_points(db, ch.id):
-                new_kp = KnowledgePoint(
-                    chapter_id=new_ch.id,
-                    parent_id=None,
-                    name=kp.name,
-                    description=kp.description,
-                    ai_summary=kp.ai_summary,
-                    sort_order=kp.sort_order,
-                )
-                db.add(new_kp)
-                db.flush()
-                kp_map[kp.id] = new_kp.id
-                kp_rows.append((new_kp, kp.parent_id))
-
-        # 第二遍：回填父子关系（父知识点可能出现在子知识点之后）
-        for new_kp, old_parent_id in kp_rows:
-            if old_parent_id and old_parent_id in kp_map:
-                new_kp.parent_id = kp_map[old_parent_id]
-
+                graph_data=graph.graph_data,
+                created_at=CourseService._now(),
+                edited_at=CourseService._now(),
+                created_by=teacher.uid,
+            ))
         db.commit()
         db.refresh(cloned)
         return cloned
 
-    # ---------- 章节 ----------
+    # ---------- 知识图谱 ----------
     @staticmethod
-    def list_chapters(db: Session, course_id: int) -> list[Chapter]:
-        return list(
-            db.scalars(
-                select(Chapter)
-                .where(Chapter.course_id == course_id)
-                .order_by(Chapter.sort_order)
-            ).all()
-        )
-
-    @staticmethod
-    def create_chapter(db: Session, course_id: int, title: str,
-                       description: str | None, sort_order: int) -> Chapter:
+    def get_graph(db: Session, course_id: int) -> KnowledgeGraph | None:
         CourseService.get_course(db, course_id)  # 校验课程存在
-        chapter = Chapter(
-            course_id=course_id, title=title,
-            description=description, sort_order=sort_order,
-        )
-        db.add(chapter)
-        db.commit()
-        db.refresh(chapter)
-        return chapter
+        return db.scalar(select(KnowledgeGraph).where(KnowledgeGraph.course_id == course_id))
 
     @staticmethod
-    def update_chapter(db: Session, chapter_id: int, data) -> Chapter:
-        chapter = db.get(Chapter, chapter_id)
-        if not chapter:
-            raise NotFoundError("章节不存在")
-        for field, value in data.model_dump(exclude_unset=True).items():
-            setattr(chapter, field, value)
+    def upsert_graph(db: Session, course_id: int, graph_data: dict,
+                     created_by: str | None) -> KnowledgeGraph:
+        """写入 / 更新课程知识图谱（每门课程一份）。"""
+        CourseService.get_course(db, course_id)
+        payload = json.dumps(graph_data, ensure_ascii=False)
+        graph = db.scalar(select(KnowledgeGraph).where(KnowledgeGraph.course_id == course_id))
+        if graph:
+            graph.graph_data = payload
+            graph.edited_at = CourseService._now()
+            if created_by:
+                graph.created_by = created_by
+        else:
+            graph = KnowledgeGraph(
+                course_id=course_id,
+                graph_data=payload,
+                created_at=CourseService._now(),
+                edited_at=CourseService._now(),
+                created_by=created_by,
+            )
+            db.add(graph)
         db.commit()
-        db.refresh(chapter)
-        return chapter
-
-    @staticmethod
-    def delete_chapter(db: Session, chapter_id: int) -> None:
-        chapter = db.get(Chapter, chapter_id)
-        if not chapter:
-            raise NotFoundError("章节不存在")
-        # 级联删除该章下的全部知识点
-        db.execute(delete(KnowledgePoint).where(KnowledgePoint.chapter_id == chapter_id))
-        db.delete(chapter)
-        db.commit()
-
-    # ---------- 知识点 ----------
-    @staticmethod
-    def list_knowledge_points(db: Session, chapter_id: int) -> list[KnowledgePoint]:
-        return list(
-            db.scalars(
-                select(KnowledgePoint)
-                .where(KnowledgePoint.chapter_id == chapter_id)
-                .order_by(KnowledgePoint.sort_order)
-            ).all()
-        )
-
-    @staticmethod
-    def create_knowledge_point(db: Session, chapter_id: int, parent_id: int | None,
-                               name: str, description: str | None,
-                               sort_order: int) -> KnowledgePoint:
-        kp = KnowledgePoint(
-            chapter_id=chapter_id, parent_id=parent_id, name=name,
-            description=description, sort_order=sort_order,
-        )
-        db.add(kp)
-        db.commit()
-        db.refresh(kp)
-        return kp
-
-    @staticmethod
-    def update_knowledge_point(db: Session, kp_id: int, data) -> KnowledgePoint:
-        kp = db.get(KnowledgePoint, kp_id)
-        if not kp:
-            raise NotFoundError("知识点不存在")
-        for field, value in data.model_dump(exclude_unset=True).items():
-            setattr(kp, field, value)
-        db.commit()
-        db.refresh(kp)
-        return kp
-
-    @staticmethod
-    def delete_knowledge_point(db: Session, kp_id: int) -> None:
-        kp = db.get(KnowledgePoint, kp_id)
-        if not kp:
-            raise NotFoundError("知识点不存在")
-        # 连带删除以其为父的子知识点
-        db.execute(delete(KnowledgePoint).where(KnowledgePoint.parent_id == kp_id))
-        db.delete(kp)
-        db.commit()
+        db.refresh(graph)
+        return graph

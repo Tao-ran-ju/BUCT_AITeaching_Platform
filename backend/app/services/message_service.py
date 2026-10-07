@@ -1,5 +1,4 @@
-"""消息服务：教师发布通知 / 作业，写入与学生端一致的消息表。"""
-import json
+"""消息服务：教师发布通知 / 作业，写入学校 personal_messages（单收件人，群发一人一行）。"""
 import os
 import uuid
 from datetime import datetime
@@ -9,9 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.exceptions import ValidateError
-from app.models.message import MessageContent, MessageReceiver
+from app.models.message import PersonalMessage
 from app.models.user import User
 from app.utils.file_handler import ensure_upload_dir
+from app.utils.identity import numeric_uid
 
 # 与学生端对齐：仅允许 Word 附件，单个 ≤10MB，存放于 uploads/messages/
 MESSAGE_ALLOWED_EXT = {".doc", ".docx"}
@@ -20,11 +20,17 @@ MESSAGE_TYPES = {"assignment", "notice", "system"}
 
 
 class MessageService:
-    """教师端消息发布业务逻辑。"""
+    """教师端消息发布业务逻辑。
+
+    学校 personal_messages 是单收件人模式（一行一个 receiver_id），教师群发时
+    为每个学生写一行、共享同一 created_at，列表时按广播分组重建。
+    """
 
     @staticmethod
     def _parse_receiver_ids(raw: str) -> list[int]:
         """解析接收者 ID：支持 JSON 数组或逗号 / 换行 / 空格分隔，去重并剔除非法值。"""
+        import json
+
         if raw is None:
             raise ValidateError("接收学生不能为空")
         raw = str(raw).strip()
@@ -69,7 +75,7 @@ class MessageService:
 
     @staticmethod
     def _parse_deadline(value: str | None) -> datetime | None:
-        """解析截止时间：支持 YYYY-MM-DD HH:MM:SS / YYYY-MM-DD HH:MM / YYYY-MM-DD。"""
+        """解析截止时间：支持 YYYY-MM-DD HH:MM:SS / HH:MM / 日期。"""
         if not value:
             return None
         value = str(value).strip()
@@ -101,7 +107,6 @@ class MessageService:
         (target_dir / filename).write_bytes(data)
 
         return {
-            # 与学生端一致的访问路径（后端 /uploads 已静态挂载）
             "file_url": f"/uploads/messages/{filename}",
             "file_name": file.filename,
             "file_size": len(data),
@@ -117,49 +122,62 @@ class MessageService:
         message_type: str,
         deadline: str | None,
         attachment: UploadFile | None,
-    ) -> tuple[MessageContent, list[int]]:
-        """发布消息：写入 message_content 一份 + message_receiver 每人一行。"""
+        assignment_id: int | None = None,
+    ) -> dict:
+        """发布消息：为每个接收学生写一行 personal_messages。"""
         if message_type not in MESSAGE_TYPES:
             raise ValidateError("消息类型必须为 assignment / notice / system")
         receivers = MessageService._parse_receiver_ids(receiver_ids)
         deadline_dt = MessageService._parse_deadline(deadline)
         att = MessageService.save_attachment(attachment)
 
-        msg = MessageContent(
-            title=title,
-            content=content,
-            sender_id=user.id,
-            sender_name=user.name,
-            message_type=message_type,
-            deadline=deadline_dt,
-            attachment_url=att["file_url"] if att else None,
-            attachment_name=att["file_name"] if att else None,
-            attachment_size=att["file_size"] if att else None,
-        )
-        db.add(msg)
-        db.flush()  # 取得自增主键 msg.id
+        sender_id = numeric_uid(user) or user.id
+        now = datetime.now()
         for rid in receivers:
-            db.add(MessageReceiver(message_id=msg.id, receiver_id=rid))
+            db.add(PersonalMessage(
+                title=title,
+                content=content,
+                sender_id=sender_id,
+                sender_name=user.name,
+                receiver_id=rid,
+                message_type=message_type,
+                status="unread",
+                created_at=now,
+                deadline=deadline_dt,
+                attachment_url=att["file_url"] if att else None,
+                attachment_name=att["file_name"] if att else None,
+                attachment_size=att["file_size"] if att else None,
+                assignment_id=assignment_id,
+            ))
         db.commit()
-        db.refresh(msg)
-        return msg, receivers
+        return {"receiver_count": len(receivers), "receiver_ids": receivers}
 
     @staticmethod
     def list_sent(db: Session, user: User) -> list[dict]:
-        """列出当前教师发送过的消息，附带接收人数与未读统计。"""
-        msgs = db.scalars(
-            select(MessageContent)
-            .where(MessageContent.sender_id == user.id)
-            .order_by(MessageContent.id.desc())
+        """列出当前教师发送过的消息（按广播分组，含接收人数与未读统计）。"""
+        sender_id = numeric_uid(user) or user.id
+        rows = db.scalars(
+            select(PersonalMessage)
+            .where(PersonalMessage.sender_id == sender_id)
+            .order_by(PersonalMessage.id.desc())
         ).all()
 
+        # 同一广播的行共享 (title, content, message_type, created_at)，据此分组重建
+        groups: dict[tuple, dict] = {}
+        order: list[tuple] = []
+        for m in rows:
+            key = (m.title, m.content, m.message_type, m.created_at)
+            if key not in groups:
+                groups[key] = {"rep": m, "count": 0, "unread": 0}
+                order.append(key)
+            groups[key]["count"] += 1
+            if m.status == "unread":
+                groups[key]["unread"] += 1
+
         out: list[dict] = []
-        for m in msgs:
-            receivers = db.scalars(
-                select(MessageReceiver).where(MessageReceiver.message_id == m.id)
-            ).all()
-            receiver_ids = [r.receiver_id for r in receivers]
-            unread = sum(1 for r in receivers if r.status == "unread")
+        for key in order:
+            g = groups[key]
+            m = g["rep"]
             out.append({
                 "id": m.id,
                 "title": m.title,
@@ -171,9 +189,9 @@ class MessageService:
                 "attachment_url": m.attachment_url,
                 "attachment_name": m.attachment_name,
                 "attachment_size": m.attachment_size,
+                "assignment_id": m.assignment_id,
                 "created_at": m.created_at,
-                "receiver_ids": receiver_ids,
-                "receiver_count": len(receiver_ids),
-                "unread_count": unread,
+                "receiver_count": g["count"],
+                "unread_count": g["unread"],
             })
         return out

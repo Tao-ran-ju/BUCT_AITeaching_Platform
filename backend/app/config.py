@@ -21,13 +21,16 @@ class Settings(BaseSettings):
     DB_PORT: int = 3306
     DB_USER: str = "root"
     DB_PASSWORD: str = ""
-    DB_NAME: str = "buct_ai_teaching"
+    DB_NAME: str = "buct_cip"
     DATABASE_URL: str = ""  # 若显式配置则优先使用（支持远程 MySQL）
 
     # ---------- JWT ----------
     SECRET_KEY: str = "change-me-in-production"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+
+    # ---------- 学生端 SSO（学生端后端用共享密钥为学生换教师端 JWT，可选）----------
+    SSO_SHARED_SECRET: str = ""
 
     # ---------- 学校 OJ 系统 ----------
     OJ_API_BASE: str = "https://buctcoder.com"

@@ -8,10 +8,17 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.routers import ok
-from app.schemas.team import MemberAddRequest, TeamCreate, TeamOut, TeamUpdate
+from app.schemas.team import MemberAddRequest, TeamCreate, TeamUpdate
 from app.services.team_service import TeamService
+from app.utils.serializers import iso_ts
 
 router = APIRouter(prefix="/teams", tags=["学习小组"])
+
+
+def _team_out(d: dict) -> dict:
+    out = dict(d)
+    out["created_at"] = iso_ts(out.get("created_at"))
+    return out
 
 
 @router.get("", summary="学习小组列表")
@@ -21,14 +28,14 @@ def list_teams(
     db: Session = Depends(get_db),
 ):
     teams = TeamService.list_teams(db, course_id)
-    return ok([TeamOut.model_validate(t) for t in teams])
+    return ok([_team_out(t) for t in teams])
 
 
 @router.post("", summary="创建学习小组")
 def create_team(data: TeamCreate, user: User = Depends(get_current_user),
                 db: Session = Depends(get_db)):
     team = TeamService.create_team(db, data)
-    return ok(TeamOut.model_validate(team))
+    return ok(_team_out(team))
 
 
 @router.put("/{team_id}", summary="更新学习小组")
@@ -36,7 +43,7 @@ def update_team(team_id: int, data: TeamUpdate,
                 user: User = Depends(get_current_user),
                 db: Session = Depends(get_db)):
     team = TeamService.update_team(db, team_id, data)
-    return ok(TeamOut.model_validate(team))
+    return ok(_team_out(team))
 
 
 @router.delete("/{team_id}", summary="删除学习小组")

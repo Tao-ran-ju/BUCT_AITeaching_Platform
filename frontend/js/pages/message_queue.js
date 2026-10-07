@@ -295,34 +295,30 @@
             '<div class="member-picker" id="tStudents">请先选择班级</div></div>',
             function (close) {
                 var title = $('tTitle').value.trim();
-                var checks = document.querySelectorAll('#tStudents input[type="checkbox"]:checked');
-                var ids = Array.prototype.map.call(checks, function (c) { return Number(c.value); });
+                var classId = Number($('tClass').value);
+                var desc = $('tDesc').value.trim();
                 if (!title) { showToast('请填写任务标题', 'error'); return; }
-                if (!ids.length) { showToast('请勾选指派学生', 'error'); return; }
+                if (!classId) { showToast('请选择班级', 'error'); return; }
+                // 学校 class_tasks 为班级级任务：全班学生均需完成，按班级下发即可
+                var content = title + (desc ? '\n' + desc : '');
                 var payload = {
-                    title: title,
+                    class_id: classId,
                     task_type: $('tType').value,
-                    deadline: $('tDeadline').value ? $('tDeadline').value + ':00' : null,
-                    course_id: $('tCourse').value ? Number($('tCourse').value) : null,
-                    description: $('tDesc').value.trim(),
-                    student_ids: ids
+                    content: content,
+                    deadline: $('tDeadline').value ? $('tDeadline').value + ':00' : null
                 };
                 api.request(api.createTask(payload)).then(function () {
                     showToast('学习任务已发布');
                     loadTasks();
                 }).catch(function () {
-                    var names = ids.map(function (sid) {
-                        var s = findStudent(sid);
-                        return s ? s.name : ('学生#' + sid);
-                    });
+                    var memberList = DEMO.students[classId] || [];
                     tasks.unshift({
-                        id: ++demoId, course_id: payload.course_id, title: title,
-                        description: payload.description, task_type: payload.task_type,
+                        id: ++demoId, class_id: classId, title: title,
+                        description: desc, task_type: payload.task_type,
                         deadline: payload.deadline, created_by: 1, created_at: nowStr(),
-                        student_count: ids.length, completed_count: 0,
-                        assignments: ids.map(function (sid, i) {
-                            var s = findStudent(sid);
-                            return { student_id: sid, name: (s ? s.name : ('学生#' + sid)), username: (s ? s.username : ''), status: 'pending', completed_at: null };
+                        student_count: memberList.length, completed_count: 0,
+                        assignments: memberList.map(function (s) {
+                            return { student_id: s.id, name: s.name, username: s.username, status: 'pending', completed_at: null };
                         })
                     });
                     showToast('演示模式：任务已本地发布');

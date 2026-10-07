@@ -134,13 +134,24 @@
         return '';
     }
 
-    function openAssignmentModal() {
+    async function openAssignmentModal() {
         if (!state.courseId) { showToast('请先选择课程', 'error'); return; }
+        var classData = await api.request(
+            api.listClasses({ page: 1, page_size: 100 }),
+            { items: [], total: 0 }
+        );
+        var classItems = (classData && classData.items) || [];
+        var classOptions = '<option value="">（不指定班级）</option>' +
+            classItems.map(function (c) {
+                return '<option value="' + c.id + '">' + esc(c.name || ('班级 #' + c.id)) + '</option>';
+            }).join('');
         openModal('发布作业',
             '<div class="form-row"><label class="form-label">作业标题</label>' +
             '<input class="form-input" id="mTitle" placeholder="如：第一次作业：分治法"></div>' +
             '<div class="form-row"><label class="form-label">作业说明</label>' +
             '<textarea class="form-textarea" id="mDesc" placeholder="选填"></textarea></div>' +
+            '<div class="form-row"><label class="form-label">布置班级 <span class="muted">（学生端按此班级下发作业）</span></label>' +
+            '<select class="form-select" id="mClassId">' + classOptions + '</select></div>' +
             '<div class="form-row"><label class="form-label">OJ 题目 ID <span class="muted">（选填，关联 buctcoder 题目后自动判题）</span></label>' +
             '<input class="form-input" id="mOjProblem" type="number" placeholder="如：1000（A+B Problem）"></div>' +
             '<div class="form-row"><label class="form-label">判题语言</label>' +
@@ -159,8 +170,10 @@
                 var title = $('mTitle').value.trim();
                 if (!title) { showToast('作业标题不能为空', 'error'); return; }
                 var ojProblem = $('mOjProblem').value.trim();
+                var classId = $('mClassId').value ? Number($('mClassId').value) : null;
                 var data = {
                     course_id: state.courseId,
+                    class_id: classId,
                     title: title,
                     description: $('mDesc').value.trim(),
                     oj_problem_id: ojProblem ? Number(ojProblem) : null,
@@ -198,7 +211,7 @@
         tbody.innerHTML = items.map(function (s) {
             var st = s.judge_status || 'pending';
             return '<tr>' +
-                '<td>' + esc(studentName(s.student_id)) + '</td>' +
+                '<td>' + esc(s.student_name || studentName(s.student_id)) + '</td>' +
                 '<td>' + esc(s.submit_time || '-') + '</td>' +
                 '<td><span class="badge ' + (STATUS_CLASS[st] || 'medium') + '">' + (STATUS_LABEL[st] || st) + '</span></td>' +
                 '<td>' + (s.score != null ? s.score : '-') + '</td>' +

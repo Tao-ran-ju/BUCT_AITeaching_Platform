@@ -1,89 +1,118 @@
-"""学情预警服务：规则引擎为主，AI 分析为辅生成干预建议。"""
+"""学情预警服务：规则引擎扫描真实数据，AI 辅助生成干预建议。"""
 import logging
-from datetime import date, datetime, timedelta
+import time
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.clients.llm_client import llm_client
+from app.config import settings
+from app.exceptions import NotFoundError
+from app.models.assignment import Assignment, AssignmentSubmission
+from app.models.course import Course
+from app.models.user import ROLE_STUDENT, User
 from app.models.warning import StudentWarning, StudyBehavior
+from app.utils.pagination import normalize_page, paginate
 
 logger = logging.getLogger(__name__)
 
 
 class WarningService:
-    """基于学习行为数据的预警扫描与 AI 干预建议生成。"""
-
-    # 规则阈值（可从 .env 覆盖）
-    RULES = {
-        "submit_delay_days": settings.WARNING_SUBMIT_DELAY_DAYS,
-        "absent_days": settings.WARNING_ABSENT_DAYS,
-        "low_score": settings.WARNING_LOW_SCORE,
-        "low_login_seconds": settings.WARNING_LOW_LOGIN_SECONDS,
-        "low_resource_visits": settings.WARNING_LOW_RESOURCE_VISITS,
-    }
-
-    # 风险等级排序权重（多条规则叠加时取更高等级）
-    _RISK_RANK = {"low": 0, "medium": 1, "high": 2}
+    """基于真实学习数据（作业提交 / 行为日志）的预警扫描与 AI 干预建议生成。"""
 
     @staticmethod
-    def _raise(cur: str, new: str) -> str:
-        """在已有等级基础上提升到更高风险，避免规则互相覆盖。"""
-        return new if WarningService._RISK_RANK[new] > WarningService._RISK_RANK[cur] else cur
+    def _now() -> int:
+        return int(time.time())
+
+    @staticmethod
+    def _existing_open(db: Session, student_user_id: int, warning_type: str):
+        return db.scalar(
+            select(StudentWarning).where(
+                StudentWarning.student_user_id == student_user_id,
+                StudentWarning.warning_type == warning_type,
+                StudentWarning.status == "open",
+            )
+        )
+
+    @staticmethod
+    def _add(db: Session, student_user_id: int, course_id: int | None,
+             warning_type: str, level: str, detail: str) -> StudentWarning | None:
+        """新增一条预警；同学生同类型已有未处理记录则跳过（幂等）。"""
+        if WarningService._existing_open(db, student_user_id, warning_type):
+            return None
+        w = StudentWarning(
+            student_user_id=student_user_id,
+            course_id=course_id,
+            warning_type=warning_type,
+            level=level,
+            detail=detail,
+            status="open",
+            created_at=WarningService._now(),
+        )
+        db.add(w)
+        return w
 
     @staticmethod
     def scan(db: Session) -> list[StudentWarning]:
-        """扫描近期学习行为，生成预警记录（幂等：已存在的同原因不重复生成）。"""
+        """扫描学生真实数据（低分 / 提交延迟 / 长期未活跃），生成预警记录。"""
+        students = db.scalars(select(User).where(User.role == ROLE_STUDENT)).all()
+        now = datetime.now()
         warnings: list[StudentWarning] = []
-        since = date.today() - timedelta(days=settings.WARNING_ABSENT_DAYS)
 
-        behaviors = db.scalars(
-            select(StudyBehavior).where(StudyBehavior.behavior_date >= since)
-        ).all()
+        for student in students:
+            subs = list(
+                db.scalars(
+                    select(AssignmentSubmission).where(
+                        AssignmentSubmission.student_user_id == student.id
+                    )
+                ).all()
+            )
 
-        # 按学生聚合最近行为
-        latest: dict[int, StudyBehavior] = {}
-        for b in behaviors:
-            latest[b.student_id] = b
+            # 低分：平均分低于阈值
+            scored = [float(s.score) for s in subs if s.score is not None]
+            if scored:
+                avg = sum(scored) / len(scored)
+                if avg < settings.WARNING_LOW_SCORE * 100:
+                    w = WarningService._add(
+                        db, student.id, None, "low_score", "high",
+                        f"作业平均分 {avg:.1f}，低于 {settings.WARNING_LOW_SCORE * 100:.0f} 分",
+                    )
+                    if w:
+                        warnings.append(w)
 
-        for student_id, b in latest.items():
-            reasons = []
-            level = "low"
-            if b.submit_delay_days and b.submit_delay_days > WarningService.RULES["submit_delay_days"]:
-                reasons.append(f"作业提交延迟 {b.submit_delay_days} 天")
-                level = WarningService._raise(level, "medium")
-            if b.homework_score is not None and b.homework_score < WarningService.RULES["low_score"] * 100:
-                reasons.append(f"作业正确率低于 {WarningService.RULES['low_score'] * 100:.0f}%")
-                level = WarningService._raise(level, "high")
-            # 学习不积极：登录时长 / 资源访问次数低于阈值
-            if b.login_duration < WarningService.RULES["low_login_seconds"]:
-                reasons.append(f"近期日均登录时长 {b.login_duration} 秒，学习不积极")
-                level = WarningService._raise(level, "medium")
-            if b.resource_visits < WarningService.RULES["low_resource_visits"]:
-                reasons.append(f"近期日均资源访问 {b.resource_visits} 次，学习不积极")
-                level = WarningService._raise(level, "medium")
-            if not reasons:
-                continue
-
-            exists = db.scalar(
-                select(StudentWarning).where(
-                    StudentWarning.student_id == student_id,
-                    StudentWarning.is_resolved.is_(False),
+            # 提交延迟：超期提交次数达到阈值
+            delayed = 0
+            for s in subs:
+                a = db.get(Assignment, s.assignment_id)
+                if a and a.deadline and s.submitted_at and s.submitted_at > a.deadline:
+                    delayed += 1
+            if delayed >= settings.WARNING_SUBMIT_DELAY_DAYS:
+                w = WarningService._add(
+                    db, student.id, None, "submit_delay", "medium",
+                    f"有 {delayed} 次作业超期提交",
                 )
-            )
-            if exists:
-                continue
+                if w:
+                    warnings.append(w)
 
-            reason = "；".join(reasons)
-            warning = StudentWarning(
-                student_id=student_id,
-                course_id=b.course_id,
-                risk_level=level,
-                reason=reason,
+            # 长期未活跃：近 N 天既无提交也无行为日志
+            recent_cutoff = now - timedelta(days=settings.WARNING_ABSENT_DAYS)
+            has_recent_sub = any(
+                s.submitted_at and s.submitted_at >= recent_cutoff for s in subs
             )
-            db.add(warning)
-            warnings.append(warning)
+            recent_behavior = db.scalar(
+                select(StudyBehavior.id).where(
+                    StudyBehavior.student_user_id == student.id,
+                    StudyBehavior.created_at >= int(recent_cutoff.timestamp()),
+                ).limit(1)
+            )
+            if not has_recent_sub and not recent_behavior:
+                w = WarningService._add(
+                    db, student.id, None, "absent", "medium",
+                    f"近 {settings.WARNING_ABSENT_DAYS} 天无学习活动",
+                )
+                if w:
+                    warnings.append(w)
 
         db.commit()
         for w in warnings:
@@ -96,36 +125,70 @@ class WarningService:
         if not llm_client.available:
             return None
         try:
-            return llm_client.intervention_suggestion(warning.reason)
+            return llm_client.intervention_suggestion(warning.detail or warning.warning_type)
         except Exception as exc:
             logger.warning("AI 干预建议生成失败: %s", exc)
             return None
 
     @staticmethod
+    def _to_out(db: Session, w: StudentWarning) -> dict:
+        student = db.get(User, w.student_user_id)
+        course = db.get(Course, w.course_id) if w.course_id else None
+        return {
+            "id": w.id,
+            "course_id": w.course_id,
+            "course_name": course.name if course else None,
+            "student_id": w.student_user_id,
+            "student_user_id": w.student_user_id,
+            "student_uid": student.uid if student else None,
+            "student_name": student.name if student else None,
+            "warning_type": w.warning_type,
+            "risk_level": w.level,
+            "reason": w.detail,
+            "suggestion": w.suggestion,
+            "intervention": w.intervention,
+            "is_resolved": w.status == "resolved",
+            "created_at": w.created_at,
+            "resolved_at": w.resolved_at,
+        }
+
+    @staticmethod
     def list(db: Session, page: int | None, page_size: int | None,
              risk_level: str | None = None) -> dict:
-        from app.utils.pagination import normalize_page, paginate
-
         page, page_size = normalize_page(page, page_size)
         stmt = select(StudentWarning)
         if risk_level:
-            stmt = stmt.where(StudentWarning.risk_level == risk_level)
+            stmt = stmt.where(StudentWarning.level == risk_level)
         total = len(db.scalars(stmt).all())
         rows = db.scalars(
             stmt.order_by(StudentWarning.id.desc())
             .offset((page - 1) * page_size).limit(page_size)
         ).all()
-        return paginate(rows, total, page, page_size)
+        items = [WarningService._to_out(db, w) for w in rows]
+        return paginate(items, total, page, page_size)
 
     @staticmethod
     def resolve(db: Session, warning_id: int, intervention: str | None = None) -> StudentWarning:
         warning = db.get(StudentWarning, warning_id)
         if not warning:
-            raise ValueError("预警记录不存在")
-        warning.is_resolved = True
-        warning.resolved_at = datetime.now()
+            raise NotFoundError("预警记录不存在")
+        warning.status = "resolved"
+        warning.resolved_at = WarningService._now()
         if intervention:
             warning.intervention = intervention
         db.commit()
         db.refresh(warning)
         return warning
+
+    @staticmethod
+    def record_behavior(db: Session, student_user_id: int, behavior_type: str,
+                        value: str | None = None, course_id: int | None = None) -> None:
+        """记录一条学生学习行为（供预警扫描与活跃度判断）。"""
+        db.add(StudyBehavior(
+            student_user_id=student_user_id,
+            course_id=course_id,
+            behavior_type=behavior_type,
+            value=value,
+            created_at=WarningService._now(),
+        ))
+        db.commit()

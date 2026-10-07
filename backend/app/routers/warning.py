@@ -3,17 +3,16 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.exceptions import NotFoundError
-from app.models.course import Course
 from app.models.user import User
 from app.models.warning import StudentWarning
 from app.routers import ok
 from app.services.warning_service import WarningService
+from app.utils.serializers import iso_ts
 
 router = APIRouter(prefix="/warnings", tags=["学情预警"])
 
@@ -24,17 +23,19 @@ class ResolveRequest(BaseModel):
     intervention: Optional[str] = None
 
 
+def _iso_warning(d: dict) -> dict:
+    d["created_at"] = iso_ts(d.get("created_at"))
+    d["resolved_at"] = iso_ts(d.get("resolved_at"))
+    return d
+
+
 @router.post("/scan", summary="触发规则引擎扫描")
 def scan_warnings(user: User = Depends(get_current_user),
                   db: Session = Depends(get_db)):
     warnings = WarningService.scan(db)
     return ok({
         "generated": len(warnings),
-        "warnings": [
-            {"id": w.id, "student_id": w.student_id, "risk_level": w.risk_level,
-             "reason": w.reason}
-            for w in warnings
-        ],
+        "warnings": [_iso_warning(WarningService._to_out(db, w)) for w in warnings],
     })
 
 
@@ -47,33 +48,7 @@ def list_warnings(
     db: Session = Depends(get_db),
 ):
     result = WarningService.list(db, page, page_size, risk_level)
-    items = result["items"]
-
-    # 补充学生姓名 / 课程名，避免前端只能看到裸 ID
-    student_ids = list({w.student_id for w in items})
-    course_ids = list({w.course_id for w in items if w.course_id})
-    name_map = (
-        {u.id: u.name for u in db.scalars(select(User).where(User.id.in_(student_ids))).all()}
-        if student_ids else {}
-    )
-    course_map = (
-        {c.id: c.name for c in db.scalars(select(Course).where(Course.id.in_(course_ids))).all()}
-        if course_ids else {}
-    )
-
-    result["items"] = [
-        {
-            "id": w.id, "student_id": w.student_id, "course_id": w.course_id,
-            "student_name": name_map.get(w.student_id),
-            "course_name": course_map.get(w.course_id) if w.course_id else None,
-            "risk_level": w.risk_level, "reason": w.reason,
-            "suggestion": w.suggestion, "is_resolved": w.is_resolved,
-            "intervention": w.intervention,
-            "resolved_at": w.resolved_at.isoformat() if w.resolved_at else None,
-            "created_at": w.created_at.isoformat(),
-        }
-        for w in items
-    ]
+    result["items"] = [_iso_warning(it) for it in result["items"]]
     return ok(result)
 
 
@@ -97,7 +72,7 @@ def resolve_warning(warning_id: int, data: ResolveRequest,
     warning = WarningService.resolve(db, warning_id, data.intervention)
     return ok({
         "id": warning.id,
-        "is_resolved": warning.is_resolved,
+        "is_resolved": warning.status == "resolved",
         "intervention": warning.intervention,
-        "resolved_at": warning.resolved_at.isoformat() if warning.resolved_at else None,
+        "resolved_at": iso_ts(warning.resolved_at),
     })

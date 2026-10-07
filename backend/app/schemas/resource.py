@@ -1,27 +1,25 @@
 """教学资源相关模型。"""
-from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
+
+from app.schemas.common import Timestamp
 
 
 class ResourceOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    """资源出参（metadata 由 metadata_json 解析而来）。"""
 
     id: int
-    title: str
-    resource_type: str
-    file_path: str
-    file_size: Optional[int] = None
     course_id: Optional[int] = None
-    uploader_id: int
-    visibility: str
-    summary: Optional[str] = None
-    keywords: Optional[str] = None
-    duration: Optional[float] = None
-    thumbnail_path: Optional[str] = None
-    transcoded_path: Optional[str] = None
-    created_at: datetime
+    name: str
+    type: str
+    file_path: str
+    file_size: int
+    permission: str
+    status: int
+    created_by: Optional[str] = None
+    metadata: Any = None
+    created_at: Timestamp
 
 
 class ResourceVisibilityUpdate(BaseModel):

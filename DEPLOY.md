@@ -16,7 +16,7 @@ nginx（80 端口）
                           │
                           ▼
                  uvicorn（FastAPI，127.0.0.1:8000）
-                          ├── MySQL 8.0（元数据）
+                          ├── 远程 MariaDB（学校 buct_cip 库）
                           ├── 本地磁盘 uploads/（工作副本）
                           └── 阿里云 OSS（可选，镜像 + 文档在线预览）
 ```
@@ -30,7 +30,7 @@ nginx（80 端口）
 | 依赖 | 说明 |
 |---|---|
 | Python 3.10+ | 后端运行环境 |
-| MySQL 8.0 | 业务数据库 |
+| 远程 MariaDB（学校 buct_cip 库） | 业务数据库（无需本地安装，走网络连接） |
 | ffmpeg / ffprobe | 视频转码、关键帧抽取（缺失不影响其它功能，仅视频后处理降级） |
 | nginx | 反向代理 + 静态资源托管 |
 | git | 拉取代码 |
@@ -49,7 +49,7 @@ Ubuntu / Debian：
 sudo apt update && sudo apt install -y git nginx python3 python3-pip ffmpeg
 ```
 
-MySQL 8.0 请按官方文档安装（也可用服务器自带的数据库，或云 RDS）。
+数据库使用学校已部署的远程 MariaDB（`buct_cip` 库），无需在服务器上安装 MySQL；只需保证服务器能连通数据库地址（见 3.1 的 `DB_HOST` / `DB_PORT`）。
 
 ---
 
@@ -72,7 +72,7 @@ git clone <你的仓库地址> .
     ├── requirements.txt
     ├── .env           # 环境变量（不入 git）
     ├── uploads/       # 上传文件（工作副本，可整体备份）
-    └── scripts/       # init_db.py / migrate_batch_*.py / seed_*.py
+    └── scripts/       # create_teacher_tables.py / seed_admin.py / seed_study_behavior.py
 ```
 
 ---
@@ -91,31 +91,33 @@ vim .env
 
 | 变量 | 说明 |
 |---|---|
-| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | MySQL 连接 |
+| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | 远程 MariaDB（学校 buct_cip 库）连接，`DB_NAME=buct_cip` |
 | `SECRET_KEY` | JWT 密钥，**务必改成随机长字符串** |
+| `SSO_SHARED_SECRET` | 学生端 SSO 换 token 的共享密钥（学生端对接必需） |
 | `LLM_API_KEY` / `LLM_API_BASE` / `LLM_MODEL` | 大模型 API |
 | `OJ_API_BASE` / `OJ_USERNAME` / `OJ_PASSWORD` | 学校 OJ 对接 |
 | `OJ_DB_*` | 学校 OJ 只读库（可选） |
-| `OSS_*` | 阿里云 OSS（可选，见第五节） |
+| `OSS_*` | 阿里云 OSS（可选，见第六节） |
 
 ### 3.2 初始化数据库
 
-**全新部署**（库里还没有表）——用 ORM 一次性建全部表：
+后端**直接映射学校已有的 `buct_cip` 库**（16 张表，MariaDB 10.11.13），这 16 张表**保持不变、不做任何改动**；
+教师端额外需要持久化的功能（OJ 评测/AI 评语/查重、讨论区、学习小组、AI 问答、题库、学情预警、学习行为）
+由 `t_` 前缀的**教师端自有表**承载。
+
+部署时只需执行：
 
 ```bash
 cd /opt/buct-ai-teaching/backend
-python3 scripts/init_db.py
+python3 scripts/create_teacher_tables.py   # 幂等建 t_ 自有表（CREATE TABLE IF NOT EXISTS）
+python3 scripts/seed_admin.py              # 写入第一个教师账号（默认 admin / admin123456）
 ```
 
-**已部署服务器升级**（库已存在，只差新字段）——按需跑增量迁移脚本（均幂等，可重复执行）：
-
-```bash
-python3 scripts/migrate_batch_d.py   # 较早批次（如已执行过可跳过）
-python3 scripts/migrate_batch_e.py   # 视频 duration/thumbnail/transcoded 字段
-python3 scripts/migrate_batch_f.py   # OSS 镜像字段 resource.oss_key
-```
-
-> 迁移脚本只补「已经存在的表」缺的列；全新库直接 `init_db.py` 即可，无需跑 migrate_*。
+> `create_teacher_tables.py` 与 `seed_admin.py` 均可重复执行（幂等）。如需灌入演示数据，
+> 可再执行 `python3 scripts/seed_study_behavior.py`（创建演示教师/课程/班级/学生并触发学情预警扫描）。
+>
+> `scripts/` 下遗留的 `init_db.py`、`migrate_batch_*.py` 是旧「本地 MySQL」时代的脚本，已不适用于
+> 直接映射 buct_cip 的新架构，**请勿执行**。
 
 ### 3.3 安装依赖
 

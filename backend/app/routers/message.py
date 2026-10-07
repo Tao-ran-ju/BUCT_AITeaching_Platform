@@ -8,7 +8,6 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.routers import ok
-from app.schemas.message import MessageOut
 from app.services.message_service import MessageService
 
 router = APIRouter(prefix="/messages", tags=["消息通知"])
@@ -25,29 +24,13 @@ async def send_message(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    msg, receivers = MessageService.send(
+    result = MessageService.send(
         db, user, title, content, receiver_ids, message_type, deadline, file
     )
-    data = MessageOut.model_validate({
-        "id": msg.id,
-        "title": msg.title,
-        "content": msg.content,
-        "sender_id": msg.sender_id,
-        "sender_name": msg.sender_name,
-        "message_type": msg.message_type,
-        "deadline": msg.deadline,
-        "attachment_url": msg.attachment_url,
-        "attachment_name": msg.attachment_name,
-        "attachment_size": msg.attachment_size,
-        "created_at": msg.created_at,
-        "receiver_ids": receivers,
-        "receiver_count": len(receivers),
-        "unread_count": len(receivers),
-    })
-    return ok(data, message=f"已发送给 {len(receivers)} 名学生")
+    return ok(result, message=f"已发送给 {result['receiver_count']} 名学生")
 
 
 @router.get("/sent", summary="我发送的消息列表")
 def list_sent(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     items = MessageService.list_sent(db, user)
-    return ok([MessageOut.model_validate(it) for it in items])
+    return ok(items)

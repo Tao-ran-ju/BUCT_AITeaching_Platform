@@ -3,11 +3,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.assignment import Assignment, AssignmentSubmission
+from app.models.class_ import ClassTask, ClassTaskCompletion
 from app.models.course import Course
 from app.models.resource import Resource
-from app.models.task import Task, TaskAssignment
-from app.models.user import User
+from app.models.user import ROLE_STUDENT, ROLE_TEACHER, User
 from app.schemas.analysis import DashboardOverview, HeatmapCell, MetricCard
+from app.utils.identity import class_member_users
 
 
 class AnalysisService:
@@ -15,8 +16,10 @@ class AnalysisService:
 
     @staticmethod
     def overview(db: Session) -> DashboardOverview:
-        """核心指标看板：通过率 / 平均分 / 提交率 / 资源点击量。"""
-        total_users = db.scalar(select(func.count(User.id))) or 0
+        """核心指标看板：师生数 / 课程 / 资源 / 通过率 / 平均分。"""
+        total_students = db.scalar(select(func.count(User.id)).where(User.role == ROLE_STUDENT)) or 0
+        total_teachers = db.scalar(select(func.count(User.id)).where(User.role == ROLE_TEACHER)) or 0
+        total_courses = db.scalar(select(func.count(Course.id))) or 0
         total_resources = db.scalar(select(func.count(Resource.id))) or 0
         submissions = db.scalars(select(AssignmentSubmission)).all()
 
@@ -28,7 +31,9 @@ class AnalysisService:
         )
 
         metrics = [
-            MetricCard(key="total_users", label="教师与学生总数", value=total_users),
+            MetricCard(key="total_students", label="学生总数", value=total_students),
+            MetricCard(key="total_teachers", label="教师总数", value=total_teachers),
+            MetricCard(key="total_courses", label="课程总数", value=total_courses),
             MetricCard(key="total_resources", label="教学资源数", value=total_resources),
             MetricCard(key="pass_rate", label="作业通过率", value=round(pass_rate * 100, 2), unit="%"),
             MetricCard(key="avg_score", label="平均分", value=round(avg_score, 2), unit="分"),
@@ -37,19 +42,15 @@ class AnalysisService:
 
     @staticmethod
     def capability_heatmap(db: Session, course_id: int | None = None) -> list[HeatmapCell]:
-        """能力矩阵热力图：按知识点汇总平均得分（0-1）。"""
-        stmt = select(
-            AssignmentSubmission.score, AssignmentSubmission.ai_comment,
-        )
-        if course_id:
-            # 通过作业关联课程，此处做简化示例
-            pass
+        """能力矩阵热力图：按作业汇总平均得分（0-1）。"""
+        rows = db.execute(
+            select(AssignmentSubmission.score, AssignmentSubmission.assignment_id)
+        ).all()
         cells: list[HeatmapCell] = []
-        for score, _ in db.execute(stmt):
+        for score, aid in rows:
             if score is None:
                 continue
-            cells.append(HeatmapCell(knowledge_point="默认知识点", value=round(score / 100, 2)))
-        # 示例：至少返回一个单元格
+            cells.append(HeatmapCell(knowledge_point=f"作业#{aid}", value=round(score / 100, 2)))
         if not cells:
             cells.append(HeatmapCell(knowledge_point="暂无数据", value=0))
         return cells[:20]
@@ -57,39 +58,39 @@ class AnalysisService:
     @staticmethod
     def task_progress(db: Session) -> dict:
         """全局任务进度热力图：学生 × 任务 完成情况矩阵。"""
-        tasks = db.scalars(select(Task).order_by(Task.id.desc())).all()
-        assignments = db.scalars(select(TaskAssignment)).all()
+        tasks = db.scalars(select(ClassTask).order_by(ClassTask.id.desc())).all()
+        completions = db.scalars(select(ClassTaskCompletion)).all()
 
-        cells_by_task: dict[int, dict[int, str]] = {t.id: {} for t in tasks}
-        student_ids: set[int] = set()
-        for a in assignments:
-            if a.task_id in cells_by_task:
-                cells_by_task[a.task_id][a.student_id] = a.status
-            student_ids.add(a.student_id)
+        completed_by_task: dict[int, set[int]] = {t.id: set() for t in tasks}
+        for c in completions:
+            if c.task_id in completed_by_task:
+                completed_by_task[c.task_id].add(c.student_user_id)
 
+        # 汇总所有涉及班级的成员，作为热力图列
+        all_member_ids: set[int] = set()
+        for t in tasks:
+            for u in class_member_users(db, t.class_id):
+                all_member_ids.add(u.id)
         user_map = (
-            {u.id: u for u in db.scalars(select(User).where(User.id.in_(student_ids))).all()}
-            if student_ids else {}
-        )
-        course_ids = {t.course_id for t in tasks if t.course_id}
-        course_map = (
-            {c.id: c.name for c in db.scalars(select(Course).where(Course.id.in_(course_ids))).all()}
-            if course_ids else {}
+            {u.id: u for u in db.scalars(select(User).where(User.id.in_(all_member_ids))).all()}
+            if all_member_ids else {}
         )
 
         student_cols = [
-            {"student_id": uid, "name": user_map[uid].name or user_map[uid].username}
-            for uid in student_ids
+            {"student_id": uid, "name": user_map[uid].name if uid in user_map else str(uid)}
+            for uid in all_member_ids
         ]
+
         task_list = []
         for t in tasks:
-            cells = cells_by_task[t.id]
-            total = len(cells)
-            completed = sum(1 for s in cells.values() if s == "completed")
+            member_ids = {u.id for u in class_member_users(db, t.class_id)}
+            cells = {sid: "completed" for sid in member_ids if sid in completed_by_task[t.id]}
+            total = len(member_ids)
+            completed = len(cells)
             task_list.append({
                 "task_id": t.id,
-                "title": t.title,
-                "course_name": course_map.get(t.course_id) if t.course_id else None,
+                "title": (t.content or "")[:30],
+                "course_name": None,
                 "deadline": t.deadline.isoformat() if t.deadline else None,
                 "total": total,
                 "completed": completed,

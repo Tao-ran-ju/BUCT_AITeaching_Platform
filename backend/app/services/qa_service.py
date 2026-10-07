@@ -1,5 +1,6 @@
 """AI 问答助手服务：学生提问 -> 自动分类 -> 简单问题自动回复 / 复杂问题转教师。"""
 import logging
+import time
 from datetime import datetime
 
 from sqlalchemy import func, select
@@ -7,9 +8,11 @@ from sqlalchemy.orm import Session
 
 from app.clients.llm_client import llm_client
 from app.exceptions import NotFoundError, ValidateError
-from app.models.message import MessageContent, MessageReceiver
+from app.models.message import PersonalMessage
 from app.models.qa import QaQuestion
 from app.models.user import User
+from app.utils.identity import numeric_uid
+from app.utils.serializers import iso_ts
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +36,10 @@ _CLASSIFY_PROMPT = (
 class QaService:
     """问答助手业务逻辑。"""
 
+    @staticmethod
+    def _now() -> int:
+        return int(time.time())
+
     # ---------- 分类与自动回答 ----------
     @staticmethod
     def _classify(content: str) -> tuple[str, str | None]:
@@ -53,39 +60,58 @@ class QaService:
             logger.warning("问答助手分类失败，按复杂处理: %s", exc)
             return "complex", None
 
-    # ---------- 回复学生（写入消息中心）----------
+    # ---------- 回复学生（写入学校消息表）----------
     @staticmethod
     def _reply_to_student(db: Session, student_id: int, title: str, content: str) -> None:
-        """把回复写入与学生端一致的消息表，学生端消息中心可见。"""
-        msg = MessageContent(
+        """把回复写入学校 personal_messages，学生端消息中心可见。"""
+        student = db.get(User, student_id)
+        receiver_id = numeric_uid(student) if student else student_id
+        db.add(PersonalMessage(
             title=title,
             content=content,
             sender_id=0,              # 0 表示系统 / AI
             sender_name=_QA_SENDER_NAME,
+            receiver_id=receiver_id,
             message_type="system",
-        )
-        db.add(msg)
-        db.flush()
-        db.add(MessageReceiver(message_id=msg.id, receiver_id=student_id))
+            status="unread",
+            created_at=datetime.now(),
+        ))
+
+    @staticmethod
+    def _to_out(db: Session, q: QaQuestion) -> dict:
+        student = db.get(User, q.student_user_id)
+        return {
+            "id": q.id,
+            "student_id": q.student_user_id,
+            "student_name": student.name if student else None,
+            "course_id": q.course_id,
+            "content": q.question,
+            "question": q.question,
+            "answer": q.answer,
+            "answered_by": q.answered_by,
+            "answered_at": iso_ts(q.answered_at),
+            "status": q.status,
+            "created_at": iso_ts(q.created_at),
+        }
 
     # ---------- 提问入口 ----------
     @staticmethod
-    def ask(db: Session, student_id: int, student_name: str,
-            course_id: int | None, content: str) -> QaQuestion:
+    def ask(db: Session, student_id: int, course_id: int | None,
+            content: str) -> QaQuestion:
         """学生提问：自动分类，简单问题自动回复，复杂问题进入教师待处理队列。"""
         classification, answer = QaService._classify(content)
 
         q = QaQuestion(
-            student_id=student_id,
-            student_name=student_name,
+            student_user_id=student_id,
             course_id=course_id,
-            content=content,
-            classification=classification,
+            question=content,
+            status=0,
+            created_at=QaService._now(),
         )
         if classification == "simple" and answer:
-            q.status = "auto_answered"
-            q.auto_answer = answer
-            q.answered_at = datetime.now()
+            q.answer = answer
+            q.answered_at = QaService._now()
+            q.status = 1
             db.add(q)
             db.flush()
             QaService._reply_to_student(
@@ -94,7 +120,6 @@ class QaService:
                 f"你问：{content}\n\n回答：{answer}",
             )
         else:
-            q.status = "pending"
             db.add(q)
 
         db.commit()
@@ -107,22 +132,26 @@ class QaService:
         """教师视角：待处理队列 + 处理统计。"""
         pending = db.scalars(
             select(QaQuestion)
-            .where(QaQuestion.status == "pending")
+            .where(QaQuestion.status == 0)
             .order_by(QaQuestion.id.asc())
         ).all()
 
-        counts = dict(
-            db.execute(
-                select(QaQuestion.status, func.count(QaQuestion.id))
-                .group_by(QaQuestion.status)
-            ).all()
-        )
+        auto_answered = db.scalar(
+            select(func.count(QaQuestion.id)).where(
+                QaQuestion.status == 1, QaQuestion.answered_by.is_(None)
+            )
+        ) or 0
+        answered = db.scalar(
+            select(func.count(QaQuestion.id)).where(
+                QaQuestion.status == 1, QaQuestion.answered_by.isnot(None)
+            )
+        ) or 0
         stats = {
-            "pending": counts.get("pending", 0),
-            "auto_answered": counts.get("auto_answered", 0),
-            "answered": counts.get("answered", 0),
+            "pending": len(pending),
+            "answered": answered,
+            "auto_answered": auto_answered,
         }
-        return {"pending": list(pending), "stats": stats}
+        return {"pending": [QaService._to_out(db, q) for q in pending], "stats": stats}
 
     # ---------- 教师人工回复 ----------
     @staticmethod
@@ -131,17 +160,17 @@ class QaService:
         q = db.get(QaQuestion, question_id)
         if not q:
             raise NotFoundError("问题不存在")
-        if q.status == "answered":
+        if q.status == 1:
             raise ValidateError("该问题已回复过")
 
-        q.status = "answered"
-        q.teacher_answer = answer
+        q.answer = answer
         q.answered_by = teacher.id
-        q.answered_at = datetime.now()
+        q.answered_at = QaService._now()
+        q.status = 1
         QaService._reply_to_student(
-            db, q.student_id,
+            db, q.student_user_id,
             "教师回复了你的提问",
-            f"你问：{q.content}\n\n教师回复：{answer}",
+            f"你问：{q.question}\n\n教师回复：{answer}",
         )
         db.commit()
         db.refresh(q)
