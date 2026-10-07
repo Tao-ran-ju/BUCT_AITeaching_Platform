@@ -131,19 +131,25 @@ vim .env
 教师端额外需要持久化的功能（OJ 评测/AI 评语/查重、讨论区、学习小组、AI 问答、题库、学情预警、学习行为）
 由 `t_` 前缀的**教师端自有表**承载。
 
-部署时只需执行：
+部署时执行（**全部幂等，可重复执行；列/表已存在则自动跳过**）：
 
 ```bash
 cd /opt/buct-ai-teaching/backend
-python3 scripts/create_teacher_tables.py   # 幂等建 t_ 自有表（CREATE TABLE IF NOT EXISTS）
+python3 scripts/create_teacher_tables.py   # 建 t_ 自有表（CREATE TABLE IF NOT EXISTS）
+python3 scripts/migrate_batch_a.py         # 补 course.open_time、student_warning 干预列；建 task/task_assignment
+python3 scripts/migrate_batch_d.py         # 补 assignment 关联 OJ 列；建 qa_question
+python3 scripts/migrate_batch_e.py         # 补 resource 视频字段（duration/缩略图/转码路径）
+python3 scripts/migrate_batch_f.py         # 补 resource.oss_key（OSS 镜像）
 python3 scripts/seed_admin.py              # 写入第一个教师账号（默认 admin / admin123456）
 ```
 
-> `create_teacher_tables.py` 与 `seed_admin.py` 均可重复执行（幂等）。如需灌入演示数据，
-> 可再执行 `python3 scripts/seed_study_behavior.py`（创建演示教师/课程/班级/学生并触发学情预警扫描）。
+> 说明：`create_teacher_tables.py` 建 `t_` 前缀自有表；`migrate_batch_a/d/e/f.py` 负责给学校已有的
+> `buct_cip` 表（course / student_warning / assignment / resource）**补新增列**——这些列无法靠
+> `create_all` 自动补（`create_all` 只建缺失的表、不给已有表加列），故用幂等 `ALTER` 脚本。
+> 如需灌入演示数据，可再执行 `python3 scripts/seed_study_behavior.py`（创建演示教师/课程/班级/学生并触发学情预警扫描）。
 >
-> `scripts/` 下遗留的 `init_db.py`、`migrate_batch_*.py` 是旧「本地 MySQL」时代的脚本，已不适用于
-> 直接映射 buct_cip 的新架构，**请勿执行**。
+> `init_db.py` 是「本地建库」时代的兜底脚本（只 `create_all` 建缺失表、不会给已有表加列），
+> 直接映射 buct_cip 的场景下已由上面的 migrate_batch_* 系列取代，无需执行。
 
 ### 3.3 安装依赖
 

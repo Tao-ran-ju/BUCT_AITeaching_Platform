@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
@@ -32,11 +32,57 @@ const moreActive = computed(() => moreNav.some((item) => route.path === item.to)
 function go(to) {
   router.push(to)
 }
+
+// ---------- 滑动下划线（悬停跟随，移开后回到当前激活项） ----------
+const navWrapper = ref(null)
+const underlineEl = ref(null)
+
+function targetEl() {
+  const wrapper = navWrapper.value
+  if (!wrapper) return null
+  // 当前激活的核心栏目，或激活的「更多功能」
+  return wrapper.querySelector('a.activated, .more-trigger.activated')
+}
+
+function moveUnderline(el) {
+  if (!el || !underlineEl.value || !navWrapper.value) return
+  const aRect = el.getBoundingClientRect()
+  const wRect = navWrapper.value.getBoundingClientRect()
+  const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0
+  underlineEl.value.style.left = (aRect.left - wRect.left + pad) + 'px'
+}
+
+function onEnter(e) {
+  moveUnderline(e.currentTarget)
+}
+
+function onLeave() {
+  moveUnderline(targetEl())
+}
+
+function reposition() {
+  nextTick(() => moveUnderline(targetEl()))
+}
+
+function onResize() {
+  reposition()
+}
+
+onMounted(() => {
+  reposition()
+  window.addEventListener('resize', onResize)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize)
+})
+
+watch(() => route.path, reposition)
 </script>
 
 <template>
   <div class="shortcut">
-    <div class="wrapper nav-wrapper">
+    <div class="wrapper nav-wrapper" ref="navWrapper">
       <img src="/assets/images/buct.png" alt="北京化工大学" class="logo">
       <img
         src="/assets/images/college_of_information_science_and_technology.png"
@@ -46,13 +92,23 @@ function go(to) {
       <span class="brand-title">教师端在线</span>
       <ul class="nav-list">
         <li v-for="item in coreNav" :key="item.to">
-          <router-link :to="item.to" :class="{ activated: isActive(item.to) }">
+          <router-link
+            :to="item.to"
+            :class="{ activated: isActive(item.to) }"
+            @mouseenter="onEnter"
+            @mouseleave="onLeave"
+          >
             {{ item.label }}
           </router-link>
         </li>
         <li>
           <el-dropdown trigger="hover">
-            <span class="more-trigger" :class="{ activated: moreActive }">更多功能 ▾</span>
+            <span
+              class="more-trigger"
+              :class="{ activated: moreActive }"
+              @mouseenter="onEnter"
+              @mouseleave="onLeave"
+            >更多功能 ▾</span>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item
@@ -67,6 +123,7 @@ function go(to) {
           </el-dropdown>
         </li>
       </ul>
+      <div class="underline" ref="underlineEl"></div>
     </div>
   </div>
 </template>
@@ -90,44 +147,48 @@ function go(to) {
 }
 
 .logo {
-  height: 40px;
+  height: 34px;
+  flex-shrink: 0;
 }
 
 .logo-college {
-  height: 40px;
-  max-height: 90%;
+  height: 34px;
   max-width: 90%;
-  margin: 0 25px;
+  max-height: 90%;
+  margin: 0 14px;
+  flex-shrink: 0;
 }
 
 .brand-title {
   line-height: 52px;
   font-family: 'STXingkai', '华文行楷', sans-serif;
   font-weight: 700;
-  font-size: 40px;
+  font-size: 30px;
   color: #333;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .nav-list {
   display: flex;
   margin-left: auto;
   line-height: 52px;
+  flex-shrink: 0;
 }
 
 .nav-list li a,
 .more-trigger {
   display: inline-block;
-  padding: 0 15px;
-  border-right: 1px solid #333;
+  padding: 0 14px;
   color: #333;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
+  white-space: nowrap;
   transition: color 0.2s;
 }
 
-.nav-list li:last-child a,
-.more-trigger {
-  border-right: none;
+.nav-list li a {
+  border-right: 1px solid #333;
 }
 
 .nav-list li a:hover,
@@ -136,11 +197,15 @@ function go(to) {
   color: var(--brand-primary);
 }
 
-.nav-list li a {
-  border-bottom: 2px solid transparent;
-}
-
-.nav-list li a.activated {
-  border-bottom: 2px solid var(--brand-primary);
+/* 滑动下划线：悬停/激活时跟随到对应栏目下方 */
+.underline {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  width: 65px;
+  height: 2px;
+  background: var(--brand-primary);
+  transition: left 0.3s ease;
+  pointer-events: none;
 }
 </style>
