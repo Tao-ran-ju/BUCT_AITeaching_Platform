@@ -41,12 +41,7 @@ const developer = {
 </script>
 
 <template>
-  <div class="wrapper page-body">
-    <div class="page-header">
-      <h2>常见问题答疑</h2>
-      <p>针对每条问答，点击右上角 + 号以查看详情，点击右上角 x 号以关闭详情</p>
-    </div>
-
+  <div>
     <div class="qa-container">
       <!-- 问答列表 -->
       <div class="qa-list">

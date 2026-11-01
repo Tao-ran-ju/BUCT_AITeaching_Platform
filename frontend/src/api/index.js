@@ -124,7 +124,9 @@ export const api = {
   updateClass: (id, data) => http.put('/classes/' + id, data),
   deleteClass: (id) => http.delete('/classes/' + id),
   listClassStudents: (id) => http.get('/classes/' + id + '/students'),
-  addClassStudents: (id, studentIds) => http.post('/classes/' + id + '/students', { student_ids: studentIds }),
+  addClassStudents: (id, students) => http.post('/classes/' + id + '/students', { students }),
+  downloadImportTemplate: () => http.get('/classes/import-template', { responseType: 'blob' }),
+  importClassStudents: (id, formData) => http.post('/classes/' + id + '/students/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   removeClassStudent: (id, studentId) => http.delete('/classes/' + id + '/students/' + studentId),
 
   // 教学资源

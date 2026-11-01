@@ -406,12 +406,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="wrapper page-body">
-    <div class="page-header">
-      <h2>学习小组管理</h2>
-      <p>组建学习小组 / 竞赛队伍，指定组长，管理成员构成。</p>
-    </div>
-
+  <div>
     <div class="team-layout">
       <!-- 左栏：新建小组 -->
       <section class="panel team-left">

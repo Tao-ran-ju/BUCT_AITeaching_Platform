@@ -160,12 +160,7 @@ onMounted(loadWarnings)
 </script>
 
 <template>
-  <div class="wrapper page-body">
-    <div class="page-header">
-      <h2>学情预警与干预</h2>
-      <p>基于学习行为规则引擎自动扫描潜在风险，支持 AI 生成个性化干预建议。</p>
-    </div>
-
+  <div>
     <div class="warn-toolbar">
       <el-button type="primary" :loading="state.scanning" @click="scanWarnings">
         {{ state.scanning ? '扫描中…' : '立即扫描' }}

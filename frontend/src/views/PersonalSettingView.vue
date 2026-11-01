@@ -2,6 +2,8 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '../api/index.js'
+import { tabState } from '../utils/tabState.js'
+import QaView from './QaView.vue'
 
 // ---------- 演示数据（无后端时回退） ----------
 const DEFAULT_AVATAR = '/assets/images/default_avatar.png'
@@ -160,6 +162,8 @@ onMounted(loadProfile)
       <p>维护个人基本信息、上传头像，并管理账号密码。</p>
     </div>
 
+    <el-tabs v-model="tabState.personalSetting">
+      <el-tab-pane label="资料" name="profile">
     <div class="profile-container">
       <!-- 左侧：头像展示与上传区 -->
       <section class="panel profile-left">
@@ -214,6 +218,12 @@ onMounted(loadProfile)
         </div>
       </section>
     </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="帮助(Q&A)" name="help" lazy>
+        <QaView />
+      </el-tab-pane>
+    </el-tabs>
 
     <!-- 修改密码对话框 -->
     <el-dialog v-model="pwdDialog.visible" title="修改密码" width="440px">

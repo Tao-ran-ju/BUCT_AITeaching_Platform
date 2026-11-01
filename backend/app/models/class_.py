@@ -29,6 +29,7 @@ class ClassRecord(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     uid: Mapped[int] = mapped_column(Integer, nullable=False, index=True, comment="学号/用户 ID")
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="学生姓名（名单冗余，未注册时展示）")
     status: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="0=正常")
     role: Mapped[int] = mapped_column(Integer, nullable=False, default=1, comment="0=教师 1=学生")
     class_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True, comment="教学班级 ID")

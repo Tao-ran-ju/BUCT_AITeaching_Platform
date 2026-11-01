@@ -35,15 +35,23 @@ class ClassOut(BaseModel):
 class ClassStudentOut(BaseModel):
     """班级学生出参。"""
 
-    id: int
+    id: Optional[int] = None
     uid: str
     name: str
+    registered: bool = False
     college: str = ""
     class_name: Optional[str] = None
     major: Optional[str] = None
 
 
-class StudentAddRequest(BaseModel):
-    """批量添加学生到班级（学号列表，缺档自动建档）。"""
+class StudentItem(BaseModel):
+    """单个待添加学生（学号 + 可选姓名）。"""
 
-    student_ids: list[int] = Field(..., min_length=1, description="学号列表")
+    uid: int = Field(..., description="学号")
+    name: Optional[str] = Field(None, description="姓名")
+
+
+class StudentAddRequest(BaseModel):
+    """添加学生到班级（学号+姓名列表，不自动建档）。"""
+
+    students: list[StudentItem] = Field(..., min_length=1, description="学生列表")

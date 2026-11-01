@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '../api/index.js'
 import { useECharts } from '../composables/useECharts.js'
+import { tabState } from '../utils/tabState.js'
 
 // ---------- 演示数据 ----------
 const DEMO = reactive({
@@ -289,12 +290,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="wrapper page-body">
-    <div class="page-header">
-      <h2>数据驾驶舱</h2>
-      <p>教学核心指标与能力矩阵热力图，帮助教师掌握整体学情。</p>
-    </div>
-
+  <div>
     <div class="dash-toolbar">
       <el-select v-model="courseFilter" placeholder="全部课程" style="width: 220px" @change="onCourseFilterChange">
         <el-option label="全部课程" value="" />
@@ -392,7 +388,7 @@ onMounted(() => {
         </div>
         <div class="panel-actions">
           <el-button size="small" type="primary" :loading="scanning" @click="scan">{{ scanning ? '扫描中…' : '立即扫描' }}</el-button>
-          <router-link to="/warning"><el-button size="small">完整预警页 →</el-button></router-link>
+          <el-button size="small" @click="tabState.home = 'warning'">完整预警页 →</el-button>
         </div>
       </div>
       <div class="panel-body">

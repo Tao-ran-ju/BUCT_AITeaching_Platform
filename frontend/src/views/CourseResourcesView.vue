@@ -2,6 +2,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../api/index.js'
+import { tabState } from '../utils/tabState.js'
+import DiscussionView from './DiscussionView.vue'
+import TeamView from './TeamView.vue'
 
 // ---------- 演示数据（无后端时回退） ----------
 let demoId = 1000
@@ -553,6 +556,8 @@ onMounted(loadCourses)
       <p>管理课程生命周期、章-节-知识点三级结构，以及多格式教学资源的上传与权限。</p>
     </div>
 
+    <el-tabs v-model="tabState.courseResources">
+      <el-tab-pane label="资源" name="resources">
     <div class="cr-layout">
       <!-- 左栏：课程结构 -->
       <div class="cr-left">
@@ -714,6 +719,16 @@ onMounted(loadCourses)
         </section>
       </div>
     </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="主题讨论区" name="discussion" lazy>
+        <DiscussionView />
+      </el-tab-pane>
+
+      <el-tab-pane label="学习小组" name="team" lazy>
+        <TeamView />
+      </el-tab-pane>
+    </el-tabs>
 
     <!-- 课程对话框 -->
     <el-dialog v-model="courseDialog.visible" :title="courseDialog.mode === 'create' ? '新建课程' : '编辑课程'" width="520px">

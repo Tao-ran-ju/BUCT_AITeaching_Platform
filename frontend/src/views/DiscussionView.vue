@@ -179,12 +179,7 @@ onMounted(loadCourses)
 </script>
 
 <template>
-  <div class="wrapper page-body">
-    <div class="page-header">
-      <h2>主题讨论区</h2>
-      <p>围绕课程发起主题讨论，支持置顶与精华帖标记，沉淀高质量问答。</p>
-    </div>
-
+  <div>
     <div class="disc-layout">
       <!-- 左栏：发帖 -->
       <section class="panel disc-left">

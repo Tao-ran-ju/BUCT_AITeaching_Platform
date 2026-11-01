@@ -1,5 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { tabState } from '../utils/tabState.js'
+import DashboardView from './DashboardView.vue'
+import WarningView from './WarningView.vue'
+
+const router = useRouter()
 
 // ========== 轮播 ==========
 const banners = [
@@ -79,7 +85,7 @@ const dayCells = computed(() => {
 
 // ========== 静态内容 ==========
 const news = [
-  { text: '新人入站必看！关于教师端的集中答疑Q&A', to: '/qa' },
+  { text: '新人入站必看！关于教师端的集中答疑Q&A', to: '/personal-setting', tab: 'help' },
   { text: '关于教师端服务器维修的通知', to: '' },
   { text: '关于教师端网页功能布局的改动通知', to: '' },
   { text: '其他公告信息示例', to: '' },
@@ -90,11 +96,25 @@ const news = [
 ]
 
 const features = [
-  { icon: '📊', title: '数据驾驶舱', desc: '核心指标 · 能力矩阵 · 学习不积极学生预警', to: '/dashboard' },
-  { icon: '⚠️', title: '学情预警与干预', desc: '规则扫描 · 风险分级 · AI 干预建议', to: '/warning' },
-  { icon: '💬', title: '主题讨论区', desc: '发帖讨论 · 精华置顶 · 师生互动', to: '/discussion' },
-  { icon: '👥', title: '学习小组', desc: '组建小组 · 指定组长 · 成员管理', to: '/team' }
+  { icon: '📊', title: '数据驾驶舱', desc: '核心指标 · 能力矩阵 · 学习不积极学生预警', action: 'dashboard' },
+  { icon: '⚠️', title: '学情预警与干预', desc: '规则扫描 · 风险分级 · AI 干预建议', action: 'warning' },
+  { icon: '💬', title: '主题讨论区', desc: '发帖讨论 · 精华置顶 · 师生互动', action: 'discussion' },
+  { icon: '👥', title: '学习小组', desc: '组建小组 · 指定组长 · 成员管理', action: 'team' }
 ]
+
+function openNews(item) {
+  if (item.tab) tabState.personalSetting = item.tab
+  if (item.to) router.push(item.to)
+}
+
+function goFeature(f) {
+  if (f.action === 'dashboard' || f.action === 'warning') {
+    tabState.home = f.action
+  } else if (f.action === 'discussion' || f.action === 'team') {
+    tabState.courseResources = f.action
+    router.push('/course-resources')
+  }
+}
 
 onMounted(() => {
   startAutoPlay()
@@ -108,86 +128,102 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="wrapper">
-    <div class="main-content">
-      <!-- 左侧：系统公告 -->
-      <div class="news">
-        <h3>系统公告</h3>
-        <ul class="news_content">
-          <li v-for="(item, i) in news" :key="i">
-            <router-link v-if="item.to" :to="item.to">{{ item.text }}</router-link>
-            <template v-else>{{ item.text }}</template>
-          </li>
-        </ul>
-      </div>
+  <div class="wrapper page-body">
+    <el-tabs v-model="tabState.home" class="home-tabs">
+      <el-tab-pane label="概览" name="overview">
+        <div class="main-content">
+          <!-- 左侧：系统公告 -->
+          <div class="news">
+            <h3>系统公告</h3>
+            <ul class="news_content">
+              <li v-for="(item, i) in news" :key="i">
+                <a v-if="item.to" href="javascript:;" @click="openNews(item)">{{ item.text }}</a>
+                <template v-else>{{ item.text }}</template>
+              </li>
+            </ul>
+          </div>
 
-      <!-- 中间：轮播 Banner -->
-      <div class="banner" @mouseenter="stopAutoPlay" @mouseleave="startAutoPlay">
-        <div class="banner-images">
-          <img
-            v-for="(b, i) in banners"
-            :key="b.src"
-            :src="b.src"
-            :alt="b.alt"
-            class="banner-item"
-            :class="{ active: currentIndex === i }"
-          >
-        </div>
-        <a href="javascript:;" class="banner-arrow arrow-left" @click="switchTo(currentIndex - 1)">&lt;</a>
-        <a href="javascript:;" class="banner-arrow arrow-right" @click="switchTo(currentIndex + 1)">&gt;</a>
-        <div class="banner-indicators">
-          <span
-            v-for="(b, i) in banners"
-            :key="i"
-            class="indicator"
-            :class="{ active: currentIndex === i }"
-            @click="switchTo(i)"
-          ></span>
-        </div>
-      </div>
+          <!-- 中间：轮播 Banner -->
+          <div class="banner" @mouseenter="stopAutoPlay" @mouseleave="startAutoPlay">
+            <div class="banner-images">
+              <img
+                v-for="(b, i) in banners"
+                :key="b.src"
+                :src="b.src"
+                :alt="b.alt"
+                class="banner-item"
+                :class="{ active: currentIndex === i }"
+              >
+            </div>
+            <a href="javascript:;" class="banner-arrow arrow-left" @click="switchTo(currentIndex - 1)">&lt;</a>
+            <a href="javascript:;" class="banner-arrow arrow-right" @click="switchTo(currentIndex + 1)">&gt;</a>
+            <div class="banner-indicators">
+              <span
+                v-for="(b, i) in banners"
+                :key="i"
+                class="indicator"
+                :class="{ active: currentIndex === i }"
+                @click="switchTo(i)"
+              ></span>
+            </div>
+          </div>
 
-      <!-- 右侧：时钟 + 日历 -->
-      <div class="sidebar">
-        <div class="card clock-card">
-          <div class="card-title">实时时钟</div>
-          <div class="digital-time">{{ digitalTime }}</div>
-          <div class="analog-clock">
-            <div class="clock-center"></div>
-            <div class="hand hour-hand" :style="{ transform: `rotate(${hourDeg}deg)` }"></div>
-            <div class="hand min-hand" :style="{ transform: `rotate(${minDeg}deg)` }"></div>
-            <div class="hand sec-hand" :style="{ transform: `rotate(${secDeg}deg)` }"></div>
+          <!-- 右侧：时钟 + 日历 -->
+          <div class="sidebar">
+            <div class="card clock-card">
+              <div class="card-title">实时时钟</div>
+              <div class="digital-time">{{ digitalTime }}</div>
+              <div class="analog-clock">
+                <div class="clock-center"></div>
+                <div class="hand hour-hand" :style="{ transform: `rotate(${hourDeg}deg)` }"></div>
+                <div class="hand min-hand" :style="{ transform: `rotate(${minDeg}deg)` }"></div>
+                <div class="hand sec-hand" :style="{ transform: `rotate(${secDeg}deg)` }"></div>
+              </div>
+            </div>
+
+            <div class="card calendar-card">
+              <div class="card-title">{{ calHeader }}</div>
+              <div class="week-row">
+                <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+              </div>
+              <div class="day-grid">
+                <div
+                  v-for="(cell, i) in dayCells"
+                  :key="i"
+                  class="day-cell"
+                  :class="{ today: cell.today, 'other-month': cell.other }"
+                >{{ cell.day }}</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="card calendar-card">
-          <div class="card-title">{{ calHeader }}</div>
-          <div class="week-row">
-            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
-          </div>
-          <div class="day-grid">
-            <div
-              v-for="(cell, i) in dayCells"
-              :key="i"
-              class="day-cell"
-              :class="{ today: cell.today, 'other-month': cell.other }"
-            >{{ cell.day }}</div>
-          </div>
+        <!-- 功能入口 -->
+        <div class="feature-entry">
+          <a v-for="f in features" :key="f.action" href="javascript:;" class="feature-card" @click="goFeature(f)">
+            <span class="feature-icon">{{ f.icon }}</span>
+            <span class="feature-title">{{ f.title }}</span>
+            <span class="feature-desc">{{ f.desc }}</span>
+          </a>
         </div>
-      </div>
-    </div>
+      </el-tab-pane>
 
-    <!-- 功能入口 -->
-    <div class="feature-entry">
-      <router-link v-for="f in features" :key="f.to" :to="f.to" class="feature-card">
-        <span class="feature-icon">{{ f.icon }}</span>
-        <span class="feature-title">{{ f.title }}</span>
-        <span class="feature-desc">{{ f.desc }}</span>
-      </router-link>
-    </div>
+      <el-tab-pane label="数据驾驶舱" name="dashboard" lazy>
+        <DashboardView />
+      </el-tab-pane>
+
+      <el-tab-pane label="学情预警" name="warning" lazy>
+        <WarningView />
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
 <style scoped>
+.home-tabs {
+  min-height: 480px;
+}
+
 .news {
   width: 300px;
   flex-shrink: 0;
@@ -218,7 +254,7 @@ onBeforeUnmount(() => {
 .main-content {
   display: flex;
   gap: 25px;
-  padding: 50px 0;
+  padding: 30px 0;
   align-items: flex-start;
 }
 
@@ -406,7 +442,7 @@ onBeforeUnmount(() => {
 .feature-entry {
   display: flex;
   gap: 25px;
-  padding-bottom: 50px;
+  padding-bottom: 30px;
 }
 .feature-card {
   flex: 1;
@@ -419,6 +455,7 @@ onBeforeUnmount(() => {
   padding: 22px 20px;
   text-decoration: none;
   color: #333;
+  cursor: pointer;
   transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
 }
 .feature-card:hover {

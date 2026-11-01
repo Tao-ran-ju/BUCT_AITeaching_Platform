@@ -1,9 +1,8 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 const route = useRoute()
-const router = useRouter()
 
 const coreNav = [
   { label: '网站主页', to: '/' },
@@ -11,26 +10,11 @@ const coreNav = [
   { label: '班级管理', to: '/class-management' },
   { label: '备课中心', to: '/aigc' },
   { label: '作业批改', to: '/homework-correction' },
-  { label: '消息队列', to: '/message-queue' },
   { label: '个人设置', to: '/personal-setting' }
-]
-
-const moreNav = [
-  { label: '数据驾驶舱', to: '/dashboard' },
-  { label: '学情预警', to: '/warning' },
-  { label: '主题讨论区', to: '/discussion' },
-  { label: '学习小组', to: '/team' },
-  { label: 'Q&A', to: '/qa' }
 ]
 
 function isActive(to) {
   return route.path === to
-}
-
-const moreActive = computed(() => moreNav.some((item) => route.path === item.to))
-
-function go(to) {
-  router.push(to)
 }
 
 // ---------- 滑动下划线（悬停跟随，移开后回到当前激活项） ----------
@@ -40,8 +24,7 @@ const underlineEl = ref(null)
 function targetEl() {
   const wrapper = navWrapper.value
   if (!wrapper) return null
-  // 当前激活的核心栏目，或激活的「更多功能」
-  return wrapper.querySelector('a.activated, .more-trigger.activated')
+  return wrapper.querySelector('a.activated')
 }
 
 function moveUnderline(el) {
@@ -101,27 +84,6 @@ watch(() => route.path, reposition)
             {{ item.label }}
           </router-link>
         </li>
-        <li>
-          <el-dropdown trigger="hover">
-            <span
-              class="more-trigger"
-              :class="{ activated: moreActive }"
-              @mouseenter="onEnter"
-              @mouseleave="onLeave"
-            >更多功能 ▾</span>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item
-                  v-for="item in moreNav"
-                  :key="item.to"
-                  @click="go(item.to)"
-                >
-                  {{ item.label }}
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </li>
       </ul>
       <div class="underline" ref="underlineEl"></div>
     </div>
@@ -176,8 +138,7 @@ watch(() => route.path, reposition)
   flex-shrink: 0;
 }
 
-.nav-list li a,
-.more-trigger {
+.nav-list li a {
   display: inline-block;
   padding: 0 14px;
   color: #333;
@@ -191,8 +152,11 @@ watch(() => route.path, reposition)
   border-right: 1px solid #333;
 }
 
+.nav-list li:last-child a {
+  border-right: none;
+}
+
 .nav-list li a:hover,
-.more-trigger:hover,
 .activated {
   color: var(--brand-primary);
 }

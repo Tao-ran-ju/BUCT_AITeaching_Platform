@@ -1,22 +1,22 @@
-"""班级路由：班级 CRUD、学生批量加入 / 移除（缺档自动建档）。"""
-import secrets
+"""班级路由：班级 CRUD、学生加入/移除（含 Excel 批量导入、是否已注册）。"""
 import time
+from io import BytesIO
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_teacher
-from app.exceptions import ForbiddenError, NotFoundError
+from app.exceptions import ForbiddenError, NotFoundError, ValidateError
 from app.models.class_ import ClassRecord, ClassRoom
 from app.models.course import Course, CourseClass
-from app.models.user import ROLE_STUDENT, User
+from app.models.user import User
 from app.routers import ok
 from app.schemas.class_ import ClassCreate, ClassUpdate, StudentAddRequest
-from app.utils.identity import class_member_users
 from app.utils.pagination import normalize_page, paginate
-from app.utils.security import hash_password
 from app.utils.serializers import iso_ts
 
 router = APIRouter(prefix="/classes", tags=["班级"])
@@ -58,18 +58,30 @@ def _class_out(db: Session, cls: ClassRoom) -> dict:
     }
 
 
-def _class_student_out(user: User) -> dict:
-    return {
-        "id": user.id,
-        "uid": user.uid,
-        "username": user.uid,
-        "name": user.name,
-        "department": user.college,
-        "phone": None,
-        "college": user.college,
-        "class_name": user.class_name,
-        "major": user.major,
-    }
+@router.get("/import-template", summary="下载学生导入 Excel 模板（学号/姓名）")
+def download_import_template(user: User = Depends(get_current_teacher)):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "学生导入"
+    ws.append(["学号", "姓名"])
+    ws.append(["20250001", "张三"])
+    ws["A1"].font = Font(bold=True)
+    ws["B1"].font = Font(bold=True)
+    ws.column_dimensions["A"].width = 20
+    ws.column_dimensions["B"].width = 20
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = "学生导入模板.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
 
 
 @router.get("", summary="班级列表")
@@ -149,59 +161,153 @@ def delete_class(class_id: int, user: User = Depends(get_current_teacher),
     return ok(message="班级已删除")
 
 
-@router.post("/{class_id}/students", summary="批量添加学生（学号，缺档自动建档）")
+@router.post("/{class_id}/students", summary="添加学生到班级（学号+姓名，不自动建档）")
 def add_students(class_id: int, data: StudentAddRequest,
                  user: User = Depends(get_current_teacher),
                  db: Session = Depends(get_db)):
     _require_class_owner(db, user, class_id)
     now = int(time.time())
-    added = 0
-    for sid in data.student_ids:
-        uid_str = str(sid)
-        student = db.scalar(select(User).where(User.uid == uid_str))
-        if not student:
-            student = User(
-                uid=uid_str,
-                password_hash=hash_password(secrets.token_urlsafe(12)),
-                name=uid_str,
-                role=ROLE_STUDENT,
-                gender=0,
-                college="",
-                status=0,
-                created_at=now,
-                edited_at=now,
-                created_by=user.id,
-            )
-            db.add(student)
-            db.flush()
+    added, skipped = [], []
+    for item in data.students:
+        uid_str = str(item.uid)
         exists = db.scalar(
             select(ClassRecord).where(
                 ClassRecord.class_id == class_id,
-                ClassRecord.uid == sid,
+                ClassRecord.uid == item.uid,
                 ClassRecord.role == 1,
             )
         )
-        if not exists:
-            db.add(ClassRecord(
-                uid=sid,
-                role=1,
-                class_id=class_id,
-                status=0,
-                created_at=now,
-                edited_at=now,
-                created_by=user.uid,
-            ))
-            added += 1
+        if exists:
+            skipped.append({"uid": item.uid})
+            continue
+        registered = db.scalar(select(User.id).where(User.uid == uid_str)) is not None
+        db.add(ClassRecord(
+            uid=item.uid,
+            name=item.name,
+            role=1,
+            class_id=class_id,
+            status=0,
+            created_at=now,
+            edited_at=now,
+            created_by=user.uid,
+        ))
+        added.append({"uid": item.uid, "name": item.name, "registered": registered})
     db.commit()
-    return ok({"added": added}, message=f"成功添加 {added} 名学生")
+    return ok({"added": added, "skipped": skipped}, message=f"成功添加 {len(added)} 名学生")
 
 
-@router.get("/{class_id}/students", summary="班级学生列表")
+@router.post("/{class_id}/students/import", summary="Excel 批量导入学生（学号+姓名）")
+def import_students(class_id: int, file: UploadFile = File(...),
+                    user: User = Depends(get_current_teacher),
+                    db: Session = Depends(get_db)):
+    _require_class_owner(db, user, class_id)
+    filename = (file.filename or "").lower()
+    if not filename.endswith((".xlsx", ".xls")):
+        raise ValidateError("仅支持 .xlsx / .xls 文件")
+
+    from openpyxl import load_workbook
+
+    try:
+        wb = load_workbook(BytesIO(file.file.read()), read_only=True, data_only=True)
+    except Exception:
+        raise ValidateError("无法解析该 Excel 文件，请使用下载的模板填写")
+
+    ws = wb.active
+    rows = []
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not row or row[0] is None or str(row[0]).strip() == "":
+            continue
+        try:
+            uid = int(row[0])
+        except (ValueError, TypeError):
+            continue
+        name = None
+        if len(row) > 1 and row[1] is not None:
+            name = str(row[1]).strip() or None
+        rows.append({"uid": uid, "name": name})
+
+    now = int(time.time())
+    added, skipped, matched, not_found = [], [], 0, 0
+    for item in rows:
+        uid_str = str(item["uid"])
+        exists = db.scalar(
+            select(ClassRecord).where(
+                ClassRecord.class_id == class_id,
+                ClassRecord.uid == item["uid"],
+                ClassRecord.role == 1,
+            )
+        )
+        if exists:
+            skipped.append({"uid": item["uid"]})
+            continue
+        registered = db.scalar(select(User.id).where(User.uid == uid_str)) is not None
+        if registered:
+            matched += 1
+        else:
+            not_found += 1
+        db.add(ClassRecord(
+            uid=item["uid"],
+            name=item["name"],
+            role=1,
+            class_id=class_id,
+            status=0,
+            created_at=now,
+            edited_at=now,
+            created_by=user.uid,
+        ))
+        added.append({"uid": item["uid"], "name": item["name"], "registered": registered})
+    db.commit()
+    return ok({
+        "total": len(rows),
+        "added": len(added),
+        "matched": matched,
+        "not_found": not_found,
+        "skipped": skipped,
+    }, message=f"成功导入 {len(added)} 名学生（已注册 {matched}，未注册 {not_found}）")
+
+
+@router.get("/{class_id}/students", summary="班级学生列表（含是否已注册）")
 def list_students(class_id: int, user: User = Depends(get_current_teacher),
                   db: Session = Depends(get_db)):
     _require_class_owner(db, user, class_id)
-    students = class_member_users(db, class_id)
-    return ok([_class_student_out(s) for s in students])
+    records = db.scalars(
+        select(ClassRecord).where(ClassRecord.class_id == class_id, ClassRecord.role == 1)
+    ).all()
+    str_uids = [str(r.uid) for r in records]
+    user_by_uid = {}
+    if str_uids:
+        for u in db.scalars(select(User).where(User.uid.in_(str_uids))).all():
+            user_by_uid[u.uid] = u
+    result = []
+    for r in records:
+        u = user_by_uid.get(str(r.uid))
+        if u:
+            result.append({
+                "id": u.id,
+                "uid": u.uid,
+                "username": u.uid,
+                "name": u.name,
+                "registered": True,
+                "department": u.college,
+                "phone": None,
+                "college": u.college,
+                "class_name": u.class_name,
+                "major": u.major,
+            })
+        else:
+            result.append({
+                "id": None,
+                "uid": str(r.uid),
+                "username": str(r.uid),
+                "name": r.name or str(r.uid),
+                "registered": False,
+                "department": None,
+                "phone": None,
+                "college": None,
+                "class_name": None,
+                "major": None,
+            })
+    return ok(result)
 
 
 @router.delete("/{class_id}/students/{student_id}", summary="移除学生（student_id 为学号）")
