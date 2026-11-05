@@ -181,6 +181,36 @@ DDL_STATEMENTS = [
         KEY idx_t_study_behavior_course (course_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='教师端自有：学习行为日志'
     """,
+    # 10. 课程章节（课程 → 章节 → 知识点 三级结构）
+    """
+    CREATE TABLE IF NOT EXISTS t_course_chapter (
+        id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        course_id   BIGINT UNSIGNED NOT NULL COMMENT '课程 ID',
+        title       VARCHAR(200)    NOT NULL COMMENT '章节标题',
+        description TEXT            NULL COMMENT '章节描述',
+        sort_order  INT             NOT NULL DEFAULT 0 COMMENT '排序序号',
+        created_at  BIGINT          NOT NULL COMMENT '创建时间（UNIX 时间戳）',
+        edited_at   BIGINT          NOT NULL COMMENT '最后编辑时间',
+        created_by  VARCHAR(255)    NULL COMMENT '创建者 uid',
+        PRIMARY KEY (id),
+        KEY idx_t_course_chapter_course (course_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='教师端自有：课程章节'
+    """,
+    # 11. 章节知识点
+    """
+    CREATE TABLE IF NOT EXISTS t_course_knowledge_point (
+        id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        chapter_id  BIGINT UNSIGNED NOT NULL COMMENT '章节 ID',
+        name        VARCHAR(200)    NOT NULL COMMENT '知识点名称',
+        description TEXT            NULL COMMENT '知识点描述',
+        sort_order  INT             NOT NULL DEFAULT 0 COMMENT '排序序号',
+        created_at  BIGINT          NOT NULL COMMENT '创建时间（UNIX 时间戳）',
+        edited_at   BIGINT          NOT NULL COMMENT '最后编辑时间',
+        created_by  VARCHAR(255)    NULL COMMENT '创建者 uid',
+        PRIMARY KEY (id),
+        KEY idx_t_course_knowledge_point_chapter (chapter_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='教师端自有：章节知识点'
+    """,
 ]
 
 

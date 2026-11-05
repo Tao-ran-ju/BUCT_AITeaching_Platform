@@ -20,7 +20,7 @@ from app.utils.logger import setup_logging
 import app.models  # noqa: F401
 
 from app.routers import (  # noqa: E402
-    assignment, auth, class_ as class_router, course, dashboard, class_record,
+    assignment, auth, class_ as class_router, course, dashboard,
     message, process, qa, resource, student, task, teaching, team, user, warning,
 )
 
@@ -79,7 +79,6 @@ def create_app() -> FastAPI:
     app.include_router(task.router, prefix=prefix)
     app.include_router(qa.router, prefix=prefix)
     app.include_router(student.router, prefix=prefix)
-    app.include_router(class_record.router, prefix=prefix)
 
     # ---------- 上传文件静态访问 ----------
     uploads_dir = Path(settings.UPLOAD_DIR)

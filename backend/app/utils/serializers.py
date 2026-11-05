@@ -52,3 +52,29 @@ def course_out(course) -> dict:
         "created_by": course.created_by,
         "created_at": iso_ts(course.created_at),
     }
+
+
+def chapter_out(chapter) -> dict:
+    """章节对象 → 前端友好 dict。"""
+    return {
+        "id": chapter.id,
+        "course_id": chapter.course_id,
+        "title": chapter.title,
+        "description": chapter.description,
+        "sort_order": chapter.sort_order,
+        "created_at": iso_ts(chapter.created_at),
+        "edited_at": iso_ts(chapter.edited_at),
+    }
+
+
+def knowledge_point_out(kp) -> dict:
+    """知识点对象 → 前端友好 dict。"""
+    return {
+        "id": kp.id,
+        "chapter_id": kp.chapter_id,
+        "name": kp.name,
+        "description": kp.description,
+        "sort_order": kp.sort_order,
+        "created_at": iso_ts(kp.created_at),
+        "edited_at": iso_ts(kp.edited_at),
+    }

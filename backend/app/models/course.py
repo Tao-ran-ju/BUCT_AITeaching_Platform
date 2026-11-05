@@ -1,6 +1,6 @@
 """课程体系模型：courses / course_classes / course_students / knowledge_graphs。"""
-from sqlalchemy import BigInteger, Integer, String, Text, ForeignKey, DateTime, Column
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import BigInteger, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
@@ -19,7 +19,6 @@ class Course(Base):
     edited_at: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="最后编辑时间")
     created_by: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="创建者 uid")
     legacy_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True, comment="旧系统迁移 ID")
-    chapters = relationship("Chapter", back_populates="course", cascade="all, delete-orphan")
 
 
 class CourseClass(Base):
@@ -60,3 +59,32 @@ class KnowledgeGraph(Base):
     edited_at: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="最后编辑时间")
     created_by: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="创建者 uid")
 
+
+class Chapter(Base):
+    """课程章节表（t_course_chapter），教师端自有：课程 → 章节 → 知识点三级结构。"""
+
+    __tablename__ = "t_course_chapter"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    course_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True, comment="课程 ID")
+    title: Mapped[str] = mapped_column(String(200), nullable=False, comment="章节标题")
+    description: Mapped[str | None] = mapped_column(Text, nullable=True, comment="章节描述")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="排序序号")
+    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="创建时间（UNIX 时间戳）")
+    edited_at: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="最后编辑时间")
+    created_by: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="创建者 uid")
+
+
+class KnowledgePoint(Base):
+    """知识点表（t_course_knowledge_point），挂在章节之下。"""
+
+    __tablename__ = "t_course_knowledge_point"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    chapter_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True, comment="章节 ID")
+    name: Mapped[str] = mapped_column(String(200), nullable=False, comment="知识点名称")
+    description: Mapped[str | None] = mapped_column(Text, nullable=True, comment="知识点描述")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="排序序号")
+    created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="创建时间（UNIX 时间戳）")
+    edited_at: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="最后编辑时间")
+    created_by: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="创建者 uid")

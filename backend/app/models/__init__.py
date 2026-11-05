@@ -6,7 +6,7 @@
 """
 from app.models.user import ROLE_STUDENT, ROLE_TEACHER, TeacherActor, User
 from app.models.class_ import ClassNotice, ClassRecord, ClassRoom, ClassTask, ClassTaskCompletion
-from app.models.course import Course, CourseClass, CourseStudent, KnowledgeGraph
+from app.models.course import Chapter, Course, CourseClass, CourseStudent, KnowledgeGraph, KnowledgePoint
 from app.models.resource import Resource
 from app.models.question import Question
 from app.models.assignment import Assignment, AssignmentOj, AssignmentSubmission, SubmissionJudge
@@ -15,7 +15,6 @@ from app.models.team import Team, TeamMember
 from app.models.warning import StudentWarning, StudyBehavior
 from app.models.message import PersonalMessage
 from app.models.qa import QaQuestion
-from app.models.chapter import Chapter
 
 __all__ = [
     "User",
@@ -30,7 +29,9 @@ __all__ = [
     "Course",
     "CourseClass",
     "CourseStudent",
+    "Chapter",
     "KnowledgeGraph",
+    "KnowledgePoint",
     "Resource",
     "Question",
     "Assignment",

@@ -8,13 +8,17 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.routers import ok
-from app.schemas.course import CourseCreate, CourseUpdate, KnowledgeGraphUpsert
+from app.schemas.course import (
+    ChapterCreate,
+    ChapterUpdate,
+    CourseCreate,
+    CourseUpdate,
+    KnowledgeGraphUpsert,
+    KnowledgePointCreate,
+    KnowledgePointUpdate,
+)
 from app.services.course_service import CourseService
-from app.utils.serializers import course_out
-
-from app.schemas.chapter import ChapterCreate, ChapterUpdate, ChapterOut
-from app.services.chapter_service import ChapterService
-
+from app.utils.serializers import chapter_out, course_out, knowledge_point_out
 
 router = APIRouter(prefix="/courses", tags=["课程"])
 
@@ -26,7 +30,7 @@ def list_courses(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    result = CourseService.list_courses(db, page=page, page_size=page_size,teacher_id=user.id)
+    result = CourseService.list_courses(db, page=page, page_size=page_size)
     result["items"] = [course_out(c) for c in result["items"]]
     return ok(result)
 
@@ -97,42 +101,64 @@ def put_graph(course_id: int, data: KnowledgeGraphUpsert,
     return ok(json.loads(graph.graph_data), message="知识图谱已保存")
 
 
-@router.get("/{course_id}/chapters", summary="获取课程章节列表")
-def list_chapters(
-    course_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
-):
-    items = ChapterService.list_chapters(db, course_id, user.id)
-    return ok(items)
+# ---------- 章节 ----------
+@router.get("/{course_id}/chapters", summary="章节列表")
+def list_chapters(course_id: int, db: Session = Depends(get_db),
+                  _: User = Depends(get_current_user)):
+    chapters = CourseService.list_chapters(db, course_id)
+    return ok([chapter_out(c) for c in chapters])
 
-@router.post("/{course_id}/chapters", summary="新增章节")
-def create_chapter(
-    course_id: int,
-    data: ChapterCreate,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
-):
-    item = ChapterService.create_chapter(db, course_id, data, user.id)
-    return ok(item, message="章节创建成功")
 
-@router.put("/{course_id}/chapters/{chapter_id}", summary="修改章节")
-def update_chapter(
-    course_id: int,
-    chapter_id: int,
-    data: ChapterUpdate,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
-):
-    item = ChapterService.update_chapter(db, course_id, chapter_id, data, user.id)
-    return ok(item, message="章节更新成功")
+@router.post("/{course_id}/chapters", summary="新建章节")
+def create_chapter(course_id: int, data: ChapterCreate,
+                   user: User = Depends(get_current_user),
+                   db: Session = Depends(get_db)):
+    chapter = CourseService.create_chapter(db, course_id, data, user.uid)
+    return ok(chapter_out(chapter), message="章节已创建")
 
-@router.delete("/{course_id}/chapters/{chapter_id}", summary="删除章节")
-def delete_chapter(
-    course_id: int,
-    chapter_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
-):
-    ChapterService.delete_chapter(db, course_id, chapter_id, user.id)
-    return ok(message="章节删除成功")
+
+@router.put("/chapters/{chapter_id}", summary="更新章节")
+def update_chapter(chapter_id: int, data: ChapterUpdate,
+                   user: User = Depends(get_current_user),
+                   db: Session = Depends(get_db)):
+    chapter = CourseService.update_chapter(db, chapter_id, data)
+    return ok(chapter_out(chapter), message="章节已更新")
+
+
+@router.delete("/chapters/{chapter_id}", summary="删除章节")
+def delete_chapter(chapter_id: int, user: User = Depends(get_current_user),
+                   db: Session = Depends(get_db)):
+    CourseService.delete_chapter(db, chapter_id)
+    return ok(message="章节已删除")
+
+
+# ---------- 知识点 ----------
+@router.get("/chapters/{chapter_id}/knowledge-points", summary="知识点列表")
+def list_knowledge_points(chapter_id: int, db: Session = Depends(get_db),
+                          _: User = Depends(get_current_user)):
+    kps = CourseService.list_knowledge_points(db, chapter_id)
+    return ok([knowledge_point_out(k) for k in kps])
+
+
+@router.post("/chapters/{chapter_id}/knowledge-points", summary="新建知识点")
+def create_knowledge_point(chapter_id: int, data: KnowledgePointCreate,
+                           user: User = Depends(get_current_user),
+                           db: Session = Depends(get_db)):
+    kp = CourseService.create_knowledge_point(db, chapter_id, data, user.uid)
+    return ok(knowledge_point_out(kp), message="知识点已创建")
+
+
+@router.put("/chapters/{chapter_id}/knowledge-points/{kp_id}", summary="更新知识点")
+def update_knowledge_point(chapter_id: int, kp_id: int, data: KnowledgePointUpdate,
+                           user: User = Depends(get_current_user),
+                           db: Session = Depends(get_db)):
+    kp = CourseService.update_knowledge_point(db, kp_id, data)
+    return ok(knowledge_point_out(kp), message="知识点已更新")
+
+
+@router.delete("/chapters/{chapter_id}/knowledge-points/{kp_id}", summary="删除知识点")
+def delete_knowledge_point(chapter_id: int, kp_id: int,
+                           user: User = Depends(get_current_user),
+                           db: Session = Depends(get_db)):
+    CourseService.delete_knowledge_point(db, kp_id)
+    return ok(message="知识点已删除")

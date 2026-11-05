@@ -43,3 +43,27 @@ class KnowledgeGraphOut(BaseModel):
 
 class KnowledgeGraphUpsert(BaseModel):
     graph_data: dict = Field(..., description="知识图谱 JSON（nodes/edges）")
+
+
+class ChapterCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = None
+    sort_order: Optional[int] = 0
+
+
+class ChapterUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    sort_order: Optional[int] = None
+
+
+class KnowledgePointCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = None
+    sort_order: Optional[int] = 0
+
+
+class KnowledgePointUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    sort_order: Optional[int] = None
