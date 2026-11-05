@@ -4,9 +4,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
-# 角色常量（user_rft.role）
-ROLE_TEACHER = 0
-ROLE_STUDENT = 1
+# 角色常量（user_rft.role）：0=学生 1=教师 2=管理员（以学校 user_rft 实际数据为准）
+ROLE_TEACHER = 1
+ROLE_STUDENT = 0
 
 
 class User(Base):
@@ -20,7 +20,7 @@ class User(Base):
     reason: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="状态原因")
     password_hash: Mapped[str] = mapped_column("password", String(255), nullable=False, comment="bcrypt 哈希")
     name: Mapped[str] = mapped_column(String(255), nullable=False, comment="真实姓名")
-    role: Mapped[int] = mapped_column(Integer, nullable=False, comment="0=教师 1=学生")
+    role: Mapped[int] = mapped_column(Integer, nullable=False, comment="0=学生 1=教师 2=管理员")
     gender: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="0=男 1=女")
     college: Mapped[str] = mapped_column(String(255), nullable=False, default="", comment="学院名称")
     grade: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="年级（仅学生）")

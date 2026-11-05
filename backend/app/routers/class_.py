@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies import get_current_teacher
 from app.exceptions import ForbiddenError, NotFoundError, ValidateError
-from app.models.class_ import ClassRecord, ClassRoom
+from app.models.class_ import ClassRecord, ClassRoom, ClassTask, ClassTaskCompletion
 from app.models.course import Course, CourseClass
 from app.models.user import User
 from app.routers import ok
@@ -155,6 +155,8 @@ def delete_class(class_id: int, user: User = Depends(get_current_teacher),
                  db: Session = Depends(get_db)):
     cls = _require_class_owner(db, user, class_id)
     db.execute(delete(ClassRecord).where(ClassRecord.class_id == class_id))
+    db.execute(delete(ClassTaskCompletion).where(ClassTaskCompletion.task_id.in_(select(ClassTask.id).where(ClassTask.class_id == class_id))))
+    db.execute(delete(ClassTask).where(ClassTask.class_id == class_id))
     db.execute(delete(CourseClass).where(CourseClass.class_id == class_id))
     db.delete(cls)
     db.commit()
