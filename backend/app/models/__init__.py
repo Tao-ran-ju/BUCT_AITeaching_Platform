@@ -15,6 +15,7 @@ from app.models.team import Team, TeamMember
 from app.models.warning import StudentWarning, StudyBehavior
 from app.models.message import PersonalMessage
 from app.models.qa import QaQuestion
+from app.models.chapter import Chapter
 
 __all__ = [
     "User",

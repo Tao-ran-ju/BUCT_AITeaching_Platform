@@ -12,6 +12,10 @@ from app.schemas.course import CourseCreate, CourseUpdate, KnowledgeGraphUpsert
 from app.services.course_service import CourseService
 from app.utils.serializers import course_out
 
+from app.schemas.chapter import ChapterCreate, ChapterUpdate, ChapterOut
+from app.services.chapter_service import ChapterService
+
+
 router = APIRouter(prefix="/courses", tags=["课程"])
 
 
@@ -22,7 +26,7 @@ def list_courses(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    result = CourseService.list_courses(db, page=page, page_size=page_size)
+    result = CourseService.list_courses(db, page=page, page_size=page_size,teacher_id=user.id)
     result["items"] = [course_out(c) for c in result["items"]]
     return ok(result)
 
@@ -91,3 +95,44 @@ def put_graph(course_id: int, data: KnowledgeGraphUpsert,
               db: Session = Depends(get_db)):
     graph = CourseService.upsert_graph(db, course_id, data.graph_data, user.uid)
     return ok(json.loads(graph.graph_data), message="知识图谱已保存")
+
+
+@router.get("/{course_id}/chapters", summary="获取课程章节列表")
+def list_chapters(
+    course_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    items = ChapterService.list_chapters(db, course_id, user.id)
+    return ok(items)
+
+@router.post("/{course_id}/chapters", summary="新增章节")
+def create_chapter(
+    course_id: int,
+    data: ChapterCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    item = ChapterService.create_chapter(db, course_id, data, user.id)
+    return ok(item, message="章节创建成功")
+
+@router.put("/{course_id}/chapters/{chapter_id}", summary="修改章节")
+def update_chapter(
+    course_id: int,
+    chapter_id: int,
+    data: ChapterUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    item = ChapterService.update_chapter(db, course_id, chapter_id, data, user.id)
+    return ok(item, message="章节更新成功")
+
+@router.delete("/{course_id}/chapters/{chapter_id}", summary="删除章节")
+def delete_chapter(
+    course_id: int,
+    chapter_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    ChapterService.delete_chapter(db, course_id, chapter_id, user.id)
+    return ok(message="章节删除成功")

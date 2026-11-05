@@ -1,6 +1,6 @@
 """课程体系模型：courses / course_classes / course_students / knowledge_graphs。"""
-from sqlalchemy import BigInteger, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import BigInteger, Integer, String, Text, ForeignKey, DateTime, Column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
@@ -19,6 +19,7 @@ class Course(Base):
     edited_at: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="最后编辑时间")
     created_by: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="创建者 uid")
     legacy_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True, comment="旧系统迁移 ID")
+    chapters = relationship("Chapter", back_populates="course", cascade="all, delete-orphan")
 
 
 class CourseClass(Base):
@@ -58,3 +59,4 @@ class KnowledgeGraph(Base):
     created_at: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="创建时间")
     edited_at: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="最后编辑时间")
     created_by: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="创建者 uid")
+
