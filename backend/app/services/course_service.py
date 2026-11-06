@@ -24,7 +24,8 @@ class CourseService:
     def list_courses(db: Session, teacher_id: int | None = None,
                      page: int | None = None, page_size: int | None = None) -> dict:
         page, page_size = normalize_page(page, page_size)
-        stmt = select(Course).where(Course.status != 100)  # 归档/删除的课程不出现在活动列表
+        # 归档（100）课程对教师仍可见（可重新发布），只有已删除（-1）才彻底隐藏。
+        stmt = select(Course).where(Course.status != -1)
         if teacher_id is not None:
             stmt = stmt.where(Course.teacher_user_id == teacher_id)
         total = len(db.scalars(stmt).all())
@@ -68,10 +69,10 @@ class CourseService:
 
     @staticmethod
     def delete_course(db: Session, course_id: int) -> None:
-        """删除课程：课程本身软删（status=100 归档，学校表用 100 表示归档/删除），
-        同时硬删其章节与知识点（教师端自有 t_ 表）。"""
+        """删除课程：课程本身软删（status=-1，与归档 100 区分开），
+        同时硬删其章节与知识点（教师端自有 t_ 表）。归档（100）仅对学生隐藏、教师仍可见。"""
         course = CourseService.get_course(db, course_id)
-        course.status = 100
+        course.status = -1
         course.edited_at = CourseService._now()
         chapter_ids = db.scalars(
             select(Chapter.id).where(Chapter.course_id == course_id)
@@ -86,6 +87,16 @@ class CourseService:
         """发布（1）/ 归档（100）/ 回到草稿（0）。"""
         course = CourseService.get_course(db, course_id)
         course.status = status
+        course.edited_at = CourseService._now()
+        db.commit()
+        db.refresh(course)
+        return course
+
+    @staticmethod
+    def set_cover(db: Session, course_id: int, cover_path: str) -> Course:
+        """更新课程封面图相对路径（uploads/...）。"""
+        course = CourseService.get_course(db, course_id)
+        course.cover = cover_path
         course.edited_at = CourseService._now()
         db.commit()
         db.refresh(course)

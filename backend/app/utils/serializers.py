@@ -46,7 +46,7 @@ def course_out(course) -> dict:
         "code": None,
         "description": course.description,
         "status": status_map.get(course.status, "draft"),
-        "cover": None,
+        "cover": getattr(course, "cover", None),
         "open_time": None,
         "teacher_user_id": course.teacher_user_id,
         "created_by": course.created_by,

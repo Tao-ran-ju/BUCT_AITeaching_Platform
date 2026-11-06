@@ -155,12 +155,14 @@ function selectCourse(id) {
 // 课程对话框
 const courseDialog = reactive({ visible: false, mode: 'create', id: null, form: { name: '', code: '', description: '', open_time: '' } })
 const courseCoverFile = ref(null)
+const courseCoverPreview = ref('')
 
 function openCourseModal() {
   courseDialog.mode = 'create'
   courseDialog.id = null
   courseDialog.form = { name: '', code: '', description: '', open_time: '' }
   courseCoverFile.value = null
+  courseCoverPreview.value = ''
   courseDialog.visible = true
 }
 
@@ -171,11 +173,17 @@ function openEditCourseModal(id) {
   courseDialog.id = id
   courseDialog.form = { name: c.name || '', code: c.code || '', description: c.description || '', open_time: toLocalInput(c.open_time) }
   courseCoverFile.value = null
+  courseCoverPreview.value = c.cover ? fullUrl(c.cover) : ''
   courseDialog.visible = true
 }
 
 function onCourseCoverChange(e) {
   courseCoverFile.value = e.target.files && e.target.files[0]
+  const file = courseCoverFile.value
+  if (courseCoverPreview.value && courseCoverPreview.value.startsWith('blob:')) {
+    URL.revokeObjectURL(courseCoverPreview.value)
+  }
+  courseCoverPreview.value = file ? URL.createObjectURL(file) : ''
 }
 
 async function submitCourse() {
@@ -579,7 +587,7 @@ onMounted(loadCourses)
                 <img v-if="c.cover" class="course-cover" :src="fullUrl(c.cover)" alt="">
                 <span v-else class="course-cover placeholder"></span>
                 <div class="course-main">
-                  <div class="name">{{ c.name }}</div>
+                  <div class="name" :title="c.name">{{ c.name }}</div>
                   <div class="meta">编号 {{ c.code || '-' }} · {{ courseStatusLabel(c.status) }}</div>
                 </div>
                 <div class="actions" @click.stop>
@@ -675,29 +683,31 @@ onMounted(loadCourses)
           </div>
           <div class="panel-body">
             <el-table :data="state.resources" size="small">
-              <el-table-column label="标题" min-width="200">
+              <el-table-column label="标题" min-width="140">
                 <template #default="{ row }">
                   <template v-if="row.resource_type === 'video'">
                     <img v-if="row.thumbnail_path" class="res-thumb" :src="resourceFileUrl(row, 'thumbnail')" alt="">
-                    <a class="res-title" :href="resourceFileUrl(row, row.transcoded_path ? 'transcoded' : 'original')" target="_blank" title="点击播放">{{ row.title }}</a>
+                    <a class="res-title" :href="resourceFileUrl(row, row.transcoded_path ? 'transcoded' : 'original')" target="_blank" :title="row.title">{{ row.title }}</a>
                   </template>
-                  <template v-else>{{ row.title }}</template>
+                  <template v-else>
+                    <span class="res-title-plain" :title="row.title">{{ row.title }}</span>
+                  </template>
                 </template>
               </el-table-column>
-              <el-table-column label="类型" width="70">
+              <el-table-column label="类型" width="64">
                 <template #default="{ row }">{{ TYPE_LABEL[row.resource_type] || '其他' }}</template>
               </el-table-column>
-              <el-table-column label="大小" width="110">
+              <el-table-column label="大小" width="100">
                 <template #default="{ row }">{{ resourceSizeCell(row) }}</template>
               </el-table-column>
-              <el-table-column label="可见性" width="120">
+              <el-table-column label="可见性" width="110">
                 <template #default="{ row }">
                   <el-select :model-value="row.visibility" size="small" @change="(v) => setVisibility(row.id, v)">
                     <el-option v-for="o in VIS_OPTIONS" :key="o.value" :value="o.value" :label="o.label" />
                   </el-select>
                 </template>
               </el-table-column>
-              <el-table-column label="摘要 / 标签" min-width="180">
+              <el-table-column label="摘要 / 标签" min-width="130">
                 <template #default="{ row }">
                   <div v-if="row.summary || row.keywords" class="res-annot">
                     <div v-if="row.summary" class="res-summary" :title="row.summary">{{ truncate(row.summary, 40) }}</div>
@@ -706,7 +716,7 @@ onMounted(loadCourses)
                   <span v-else class="pending-tip">—</span>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="140">
+              <el-table-column label="操作" width="124">
                 <template #default="{ row }">
                   <div class="row-actions">
                     <el-button v-if="canPreview(row)" size="small" @click="previewResource(row.id)">预览</el-button>
@@ -746,7 +756,11 @@ onMounted(loadCourses)
           <el-date-picker v-model="courseDialog.form.open_time" type="datetime" value-format="YYYY-MM-DDTHH:mm" placeholder="选择开放时间" style="width: 100%" />
         </el-form-item>
         <el-form-item v-if="courseDialog.mode === 'edit'" label="封面图">
-          <input type="file" accept="image/*" @change="onCourseCoverChange">
+          <div class="cover-uploader">
+            <img v-if="courseCoverPreview" class="cover-preview" :src="courseCoverPreview" alt="">
+            <span v-else class="cover-preview placeholder"></span>
+            <input type="file" accept="image/*" @change="onCourseCoverChange">
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -773,7 +787,7 @@ onMounted(loadCourses)
 
     <!-- 知识点对话框 -->
     <el-dialog v-model="kpDialog.visible" :title="kpDialog.mode === 'create' ? '新建知识点' : '编辑知识点'" width="460px">
-      <el-form label-width="80px">
+      <el-form label-width="100px">
         <el-form-item label="知识点名称" required>
           <el-input v-model="kpDialog.form.name" placeholder="如：递归与主定理" />
         </el-form-item>
@@ -847,7 +861,8 @@ onMounted(loadCourses)
   display: flex;
   gap: 4px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
   justify-content: flex-end;
 }
 
@@ -861,6 +876,24 @@ onMounted(loadCourses)
   background: #f4f4f4;
 }
 .course-cover.placeholder {
+  display: inline-block;
+  background: linear-gradient(135deg, #f3e8ff, #eadcfb);
+}
+
+.cover-uploader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cover-preview {
+  width: 200px;
+  height: 112px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #e5e5e5;
+  background: #f4f4f4;
+}
+.cover-preview.placeholder {
   display: inline-block;
   background: linear-gradient(135deg, #f3e8ff, #eadcfb);
 }
@@ -942,5 +975,19 @@ onMounted(loadCourses)
 .res-title:hover {
   color: #6a0dad;
   text-decoration: underline;
+}
+.res-title-plain {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  color: #333;
+}
+
+/* 表单标签不换行，避免「知识点名称」等较长标签折行 */
+:deep(.el-form-item__label) {
+  white-space: nowrap;
 }
 </style>

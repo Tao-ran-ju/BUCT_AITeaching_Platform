@@ -1,11 +1,13 @@
 """课程路由：课程 CRUD + 知识图谱。"""
 import json
+import os
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.exceptions import ValidateError
 from app.models.user import User
 from app.routers import ok
 from app.schemas.course import (
@@ -18,7 +20,11 @@ from app.schemas.course import (
     KnowledgePointUpdate,
 )
 from app.services.course_service import CourseService
+from app.utils.file_handler import save_upload_file
 from app.utils.serializers import chapter_out, course_out, knowledge_point_out
+
+# 封面图允许的图片格式
+_COVER_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 router = APIRouter(prefix="/courses", tags=["课程"])
 
@@ -83,6 +89,19 @@ def publish_course(course_id: int, user: User = Depends(get_current_user),
                    db: Session = Depends(get_db)):
     course = CourseService.set_status(db, course_id, 1)
     return ok(course_out(course), message="课程已发布")
+
+
+@router.post("/{course_id}/cover", summary="上传课程封面图")
+async def upload_course_cover(course_id: int, file: UploadFile = File(...),
+                              user: User = Depends(get_current_user),
+                              db: Session = Depends(get_db)):
+    CourseService.get_course(db, course_id)  # 校验课程存在
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in _COVER_EXT:
+        raise ValidateError("封面仅支持图片格式（png/jpg/jpeg/gif/webp）")
+    cover_path = save_upload_file(file, f"course/{course_id}/cover")
+    course = CourseService.set_cover(db, course_id, cover_path)
+    return ok(course_out(course), message="封面已上传")
 
 
 @router.get("/{course_id}/graph", summary="获取知识图谱")
